@@ -32,7 +32,7 @@ exec "$DIR/monkeycut-app" "$@"
 LAUNCH
 chmod +x "$STAGE/$OUT/monkeycut"
 
-(cd "$STAGE" && zip -qr "../$OUT.zip" "$OUT")
+zip -qr "$STAGE/$OUT.zip" "$STAGE/$OUT"
 mv "$STAGE/$OUT.zip" "$PWD/"
 rm -rf "$STAGE"
 echo "written: $OUT.zip"

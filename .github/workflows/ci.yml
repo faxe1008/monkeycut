@@ -105,20 +105,30 @@ jobs:
             Move-Item $src.FullName ffmpeg
           }
 
+      - name: Locate MSVC vcvars
+        shell: pwsh
+        run: |
+          $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vsPath) { throw "Visual Studio C++ workload not found" }
+          $vcvars = Join-Path $vsPath "VC\Auxiliary\Build\vcvars64.bat"
+          if (-not (Test-Path $vcvars)) { throw "vcvars64.bat not found at $vcvars" }
+          Add-Content $env:GITHUB_ENV "VCVARS=$vcvars"
+
       - name: Configure (MSVC + Ninja)
         shell: pwsh
         run: |
           # The bare runner PATH finds MinGW first; the Qt/FFmpeg builds
-          # here are MSVC x64, so configure inside vcvars64.
-          $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-          $vcvars = Join-Path $vsPath "VC\Auxiliary\Build\vcvars64.bat"
-          if (-not (Test-Path $vcvars)) { throw "vcvars64.bat not found at $vcvars" }
-          & cmd /c "`"$vcvars`" && cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:\Qt\$env:QT_VERSION\msvc2022_64 -DFFmpeg_ROOT=$PWD\ffmpeg"
+          # here are MSVC x64, so run inside the vcvars64 environment.
+          & .\scripts\import-vcvars.ps1 -Vcvars $env:VCVARS
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:\Qt\$env:QT_VERSION\msvc2022_64 -DFFmpeg_ROOT=$PWD\ffmpeg
           if ($LASTEXITCODE -ne 0) { throw "cmake configure failed" }
 
       - name: Build
         shell: pwsh
-        run: cmake --build build
+        run: |
+          # cl/link need the vcvars INCLUDE/LIB paths at build time too.
+          & .\scripts\import-vcvars.ps1 -Vcvars $env:VCVARS
+          cmake --build build
 
       - name: Test
         shell: pwsh
