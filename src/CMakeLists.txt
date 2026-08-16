@@ -19,6 +19,8 @@ add_library(monkeycut STATIC
   core/Fps.h
   ui/MainWindow.cpp
   ui/MainWindow.h
+  ui/VideoView.cpp
+  ui/VideoView.h
 )
 target_include_directories(monkeycut PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(monkeycut PUBLIC

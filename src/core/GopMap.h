@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include <QMetaType>
 #include <QtGlobal>
 #include <QVector>
 
@@ -31,3 +32,5 @@ struct GopMap
         return *it;
     }
 };
+
+Q_DECLARE_METATYPE(GopMap)
