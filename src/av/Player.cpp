@@ -272,9 +272,28 @@ private:
         uint8_t* outBuf = static_cast<uint8_t*>(av_malloc(cap * 2 * sizeof(int16_t)));
         if (!outBuf)
             return;
+        // swr_convert()'s 'in' parameter drifted across libswresample
+// releases: no const (4.x), 'const uint8_t **' (5.0.x), and
+// 'const uint8_t * const *' (5.1+). The 5.0.x form accepts neither
+// 'uint8_t **' nor a reinterpret of it, so copy the (read-only)
+// plane pointers into a const-pointer array whose decay yields the
+// expected type.
+#if LIBSWRESAMPLE_VERSION_INT >= AV_VERSION_INT(5, 1, 0)
         const int outSamples = swr_convert(m_swr, &outBuf, 1,
                                            frame->data,
                                            frame->nb_samples);
+#elif LIBSWRESAMPLE_VERSION_INT >= AV_VERSION_INT(5, 0, 0)
+        const uint8_t* inData[AV_NUM_DATA_POINTERS];
+        for (size_t i = 0; i < AV_NUM_DATA_POINTERS; ++i)
+            inData[i] = frame->data[i];
+        const int outSamples = swr_convert(m_swr, &outBuf, 1,
+                                           inData,
+                                           frame->nb_samples);
+#else
+        const int outSamples = swr_convert(m_swr, &outBuf, 1,
+                                           frame->data,
+                                           frame->nb_samples);
+#endif
         if (outSamples > 0) {
             qint64 ms = frame->pts != AV_NOPTS_VALUE
                 ? ptsToMs(frame->pts, ast->time_base) - m_startMs
@@ -492,7 +511,7 @@ qint64 Player::clockFrame() const
 
 qint64 Player::clampFrame(qint64 frame) const
 {
-    const qint64 maxF = m_totalFrames > 0 ? m_totalFrames - 1 : (1 << 40);
+    const qint64 maxF = m_totalFrames > 0 ? m_totalFrames - 1 : (1LL << 40);
     if (frame < 0)
         return 0;
     if (frame > maxF)
