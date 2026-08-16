@@ -8,6 +8,7 @@
 #include <QTimer>
 #include <QtGlobal>
 
+#include <limits>
 #include <type_traits>
 
 namespace
@@ -513,8 +514,19 @@ qint64 Player::msToFrame(qint64 ms) const
 {
     if (!m_fps.isValid())
         return 0;
+#if defined(__SIZEOF_INT128__)
     const __int128 v = static_cast<__int128>(ms) * m_fps.num + 500 * m_fps.den;
     return static_cast<qint64>(v / (1000 * m_fps.den));
+#else
+    const long double num = static_cast<long double>(ms) * static_cast<long double>(m_fps.num);
+    const long double den = 1000.0L * static_cast<long double>(m_fps.den);
+    const long double rounded = num >= 0.0L ? (num + den / 2.0L) / den : (num - den / 2.0L) / den;
+    if (rounded >= static_cast<long double>(std::numeric_limits<qint64>::max()))
+        return std::numeric_limits<qint64>::max();
+    if (rounded <= static_cast<long double>(std::numeric_limits<qint64>::min()))
+        return std::numeric_limits<qint64>::min();
+    return static_cast<qint64>(rounded);
+#endif
 }
 
 qint64 Player::clockFrame() const
