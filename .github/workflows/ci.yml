@@ -5,7 +5,8 @@ on:
   pull_request:
 
 env:
-  QT_VERSION: "6.9.2"
+  QT_VERSION: "6.11.1"
+  QT_INSTALL_DIR: qt
 
 jobs:
   linux:
@@ -17,32 +18,35 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            ninja-build pkg-config \
+            ninja-build pkg-config python3-pip \
             libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev \
             libglib2.0-0t64 libgl1 libegl1 libfontconfig1 libdbus-1-3 libxkbcommon0
 
-      - name: Qt (official desktop archive)
+      - name: Qt (cache)
         uses: actions/cache@v4
         id: qt-cache
         with:
-          path: qt
+          path: ${{ env.QT_INSTALL_DIR }}
           key: linux-qt-${{ env.QT_VERSION }}
+
       - if: steps.qt-cache.outputs.cache-hit != 'true'
-        name: Qt download
+        name: Qt (aqtinstall)
         run: |
-          curl -fL -o qt.7z https://download.qt.io/official_releases/qt/6.9/6.9.2/qt-everywhere-linux-x86_64-6.9.2.7z
-          7z x qt.7z -oqt -y > /dev/null
+          python3 -m pip install --user aqtinstall
+          python3 -m aqt install-qt linux desktop "$QT_VERSION" -O "$QT_INSTALL_DIR"
 
       - name: Configure
         run: >
           cmake -B build -G Ninja
           -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_PREFIX_PATH=$PWD/qt
+          -DCMAKE_PREFIX_PATH=$PWD/qt/${QT_VERSION}/gcc_64
 
       - name: Build
         run: cmake --build build
 
       - name: Test
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: ctest --test-dir build --output-on-failure
 
   windows:
@@ -50,15 +54,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Qt (official desktop archive)
+      - name: Qt (cache)
+        uses: actions/cache@v4
+        id: qt-cache
+        with:
+          path: C:\Qt
+          key: windows-qt-${{ env.QT_VERSION }}
+
+      - if: steps.qt-cache.outputs.cache-hit != 'true'
+        name: Qt (aqtinstall)
         shell: pwsh
         run: |
-          if (-not (Test-Path qt)) {
-            curl.exe -fL -o qt.7z https://download.qt.io/official_releases/qt/6.9/6.9.2/qt-everywhere-windows-desktop-6.9.2.7z
-            7z.exe x qt.7z -oqt -y | Out-Null
-          }
+          py -3 -m pip install --user aqtinstall
+          py -3 -m aqt install-qt windows desktop "$env:QT_VERSION" win64_msvc2022_64 -O C:\Qt
 
-      - name: FFmpeg (gyan.dev shared build)
+      - name: FFmpeg (gyan-dev builds)
         shell: pwsh
         run: |
           if (-not (Test-Path ffmpeg)) {
@@ -72,10 +82,8 @@ jobs:
         shell: pwsh
         run: >
           cmake -B build -G "Ninja Multi-Config"
-          -DCMAKE_PREFIX_PATH=$PWD/qt
-          -DFFmpeg_ROOT=$PWD/ffmpeg
-        env:
-          CMAKE_PROGRAM_PATH: ${{ github.workspace }}\qt\Tools\Ninja
+          -DCMAKE_PREFIX_PATH=C:\Qt\$env:QT_VERSION\msvc2022_64
+          -DFFmpeg_ROOT=$PWD\ffmpeg
 
       - name: Build
         shell: pwsh
@@ -85,5 +93,5 @@ jobs:
         shell: pwsh
         run: >
           $env:QT_QPA_PLATFORM = 'offscreen'
-          $env:PATH = "$env:GITHUB_WORKSPACE\qt\Tools\windeployqt;$env:PATH"
+          $env:PATH = "C:\Qt\$env:QT_VERSION\msvc2022_64\bin;$env:PATH"
           ctest --test-dir build -C Release --output-on-failure
