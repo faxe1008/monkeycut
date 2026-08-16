@@ -17,6 +17,8 @@ class Player;
 class VideoView;
 class TimelineBar;
 class CuttingEngine;
+class CutlistAtDialog;
+struct CulFile;
 
 class MainWindow : public QMainWindow
 {
@@ -29,6 +31,7 @@ public:
 
     void openVideo(const QString& path);
     void loadCulFile(const QString& path);
+    void loadCulFromData(const QByteArray& data, const QString& name);
     void loadProjectFile(const QString& path);
     void seekToFrame(qint64 frame);
     bool startExport(const QString& outputPath);
@@ -40,6 +43,7 @@ protected:
 
 private slots:
     void openFile();
+    void searchCutlistAt();
     void openProject();
     void saveCutlist();
     void saveProject();
@@ -59,6 +63,7 @@ private:
     void buildUi();
     void updateStatusInfo();
     void refreshCutTable();
+    void applyCul(const CulFile& cul, const QString& sourceName);
     void showError(const QString& message);
     void showInfo(const QString& message);
 

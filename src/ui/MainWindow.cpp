@@ -8,6 +8,7 @@
 #include "cut/CuttingEngine.h"
 #include "cut/CulFile.h"
 #include "cut/Project.h"
+#include "ui/CutlistAtDialog.h"
 #include "ui/TimelineBar.h"
 #include "ui/VideoView.h"
 
@@ -72,6 +73,12 @@ void MainWindow::buildUi()
     exportAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
     fileMenu->addSeparator();
     fileMenu->addAction(tr("&Quit"), this, &QWidget::close);
+
+    auto* clMenu = menuBar()->addMenu(tr("&cutlist.at"));
+    auto* clSearchAct =
+        clMenu->addAction(tr("Search for &cutlists…"), this,
+                          &MainWindow::searchCutlistAt);
+    Q_UNUSED(clSearchAct)
 
     auto* central = new QWidget(this);
     auto* lay = new QVBoxLayout(central);
@@ -302,15 +309,25 @@ void MainWindow::loadCulFile(const QString& path)
         showError(err);
         return;
     }
+    applyCul(cul, QFileInfo(path).fileName());
+}
+
+void MainWindow::loadCulFromData(const QByteArray& data, const QString& name)
+{
+    applyCul(parseCul(QString::fromUtf8(data)), name);
+}
+
+void MainWindow::applyCul(const CulFile& cul, const QString& sourceName)
+{
     if (!m_player->isOpen()) {
         showInfo(tr("Cutlist “%1”: no video open yet – open a video now.")
-                     .arg(QFileInfo(path).fileName()));
+                     .arg(sourceName));
         return;
     }
     Cutlist l = culToCutlist(cul);
     l.setTotalFrames(m_player->totalFrames());
     if (l.cuts().isEmpty()) {
-        showError(tr("No cut ranges found in “%1”.").arg(path));
+        showError(tr("No cut ranges found in “%1”.").arg(sourceName));
         return;
     }
     m_cutlist = l;
@@ -319,7 +336,14 @@ void MainWindow::loadCulFile(const QString& path)
     m_timeline->updateCuts(m_cutlist);
     showInfo(tr("Cutlist loaded: %1 keep-ranges from “%2” (replacing current).")
                  .arg(l.cuts().size())
-                 .arg(QFileInfo(path).fileName()));
+                 .arg(sourceName));
+}
+
+void MainWindow::searchCutlistAt()
+{
+    CutlistAtDialog dlg(this);
+    if (dlg.exec() == QDialog::Accepted && !dlg.culData().isEmpty())
+        loadCulFromData(dlg.culData(), dlg.culName());
 }
 
 void MainWindow::loadProjectFile(const QString& path)

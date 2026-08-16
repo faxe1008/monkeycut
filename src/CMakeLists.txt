@@ -34,6 +34,10 @@ add_library(monkeycut STATIC
   ui/VideoView.h
   ui/TimelineBar.cpp
   ui/TimelineBar.h
+  ui/CutlistAtDialog.cpp
+  ui/CutlistAtDialog.h
+  net/CutlistAtClient.cpp
+  net/CutlistAtClient.h
 )
 target_include_directories(monkeycut PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(monkeycut PUBLIC
