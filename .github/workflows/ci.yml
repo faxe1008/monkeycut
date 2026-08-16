@@ -71,7 +71,10 @@ jobs:
         shell: pwsh
         run: |
           py -3 -m pip install --user aqtinstall
-          py -3 -m aqt install-qt windows desktop "$env:QT_VERSION" win64_msvc2022_64 -O C:\Qt
+          # py7zr (aqt's built-in extractor) intermittently fails with
+          # Bad7zFile on the Qt 6.8.3 qtbase archive; use the runner's
+          # 7-Zip instead.
+          py -3 -m aqt install-qt windows desktop "$env:QT_VERSION" win64_msvc2022_64 -O C:\Qt -E "C:\Program Files\7-Zip\7z.exe"
 
       - name: FFmpeg (BtbN shared build)
         shell: pwsh
