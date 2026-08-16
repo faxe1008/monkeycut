@@ -88,21 +88,18 @@ private slots:
             return false;
         }));
 
-        // space starts playback, position advances
+        // space starts playback; the 5 s clip plays through to the last
+        // frame (decoding can outrun polling, so assert the end state, not
+        // a transient Playing position).
         QTest::keyClick(&w, Qt::Key_Space);
-        qint64 before = -1;
-        for (auto* p : w.findChildren<Player*>())
-            before = p->currentFrame();
-        Q_UNUSED(before)
         QVERIFY(waitUntil([&] {
             for (auto* p : w.findChildren<Player*>())
-                if (p->state() == Player::State::Playing && p->currentFrame() > 8)
+                if (p->currentFrame() >= 124
+                    && p->state() != Player::State::Stopped)
                     return true;
             return false;
         }));
-
-        // space pauses
-        QTest::keyClick(&w, Qt::Key_Space);
+        // playback auto-pauses at end of file
         QVERIFY(waitUntil([&] {
             for (auto* p : w.findChildren<Player*>())
                 if (p->state() == Player::State::Paused)

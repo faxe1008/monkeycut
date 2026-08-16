@@ -255,7 +255,8 @@ private:
                                     &ast->codecpar->ch_layout,
                                     static_cast<AVSampleFormat>(frame->format),
                                     ast->codecpar->sample_rate, 0, nullptr)
-                < 0) {
+                < 0
+                || (m_swr && swr_init(m_swr) < 0)) {
                 swr_free(&m_swr);
                 m_swr = nullptr;
                 av_channel_layout_uninit(&out);
