@@ -97,15 +97,8 @@ New-Item -ItemType Directory $workDir | Out-Null
 $wxsPath = Join-Path $workDir "monkeycut.wxs"
 [System.IO.File]::WriteAllText($wxsPath, $xml.ToString(), [System.Text.Encoding]::UTF8)
 
-& $Wix build $wxsPath
-if ($LASTEXITCODE -ne 0) { throw "wix build failed" }
-
-$pdb = Get-ChildItem $workDir -Recurse -Filter *.wixpdb |
-    Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if (-not $pdb) { throw "no .wixpdb produced by wix build" }
-
 $Out = (Resolve-Path (Split-Path $Out -Parent)).Path + "\$(Split-Path $Out -Leaf)"
-& $Wix pack $pdb.FullName -o $Out
-if ($LASTEXITCODE -ne 0) { throw "wix pack failed" }
+& $Wix build $wxsPath -o $Out
+if ($LASTEXITCODE -ne 0) { throw "wix build failed" }
 
 Write-Host "written: $Out ($((Get-Item $Out).Length / 1MB) MB)"
