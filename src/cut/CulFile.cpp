@@ -199,13 +199,25 @@ bool saveCul(const QString& path, const CulFile& file, QString* error)
     return true;
 }
 
-Cutlist culToCutlist(const CulFile& cul)
+Cutlist culToCutlist(const CulFile& cul, double targetFps)
 {
     Cutlist list;
+    double culFps = cul.framesPerSecond();
+    if (culFps <= 0)
+        culFps = 25.0;
+    const double outFps = targetFps > 0 ? targetFps : culFps;
     QVector<QPair<qint64, qint64>> ranges;
     for (int i = 0; i < cul.cuts.size(); ++i) {
-        const qint64 in = cul.cutStartFrame(i);
-        const qint64 out = cul.cutEndFrame(i);
+        const CulFile::CutSeg& s = cul.cuts[i];
+        const double inSec =
+            s.startFrame > 0 ? double(s.startFrame) / culFps : s.startSec;
+        const double durSec =
+            s.durationFrames > 0 ? double(s.durationFrames) / culFps
+                                  : s.durationSec;
+        if (durSec <= 0)
+            continue;
+        const qint64 in = qint64(qRound(inSec * outFps));
+        const qint64 out = qint64(qRound((inSec + durSec) * outFps));
         if (out > in)
             ranges.append({in, out});
     }

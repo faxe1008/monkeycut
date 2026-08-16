@@ -8,6 +8,7 @@
 #include "cut/CuttingEngine.h"
 #include "cut/CulFile.h"
 #include "cut/Project.h"
+#include "cut/RecordingMatcher.h"
 #include "ui/CutlistAtDialog.h"
 #include "ui/TimelineBar.h"
 #include "ui/VideoView.h"
@@ -324,7 +325,7 @@ void MainWindow::applyCul(const CulFile& cul, const QString& sourceName)
                      .arg(sourceName));
         return;
     }
-    Cutlist l = culToCutlist(cul);
+    Cutlist l = culToCutlist(cul, m_player->fps().value());
     l.setTotalFrames(m_player->totalFrames());
     if (l.cuts().isEmpty()) {
         showError(tr("No cut ranges found in “%1”.").arg(sourceName));
@@ -342,8 +343,69 @@ void MainWindow::applyCul(const CulFile& cul, const QString& sourceName)
 void MainWindow::searchCutlistAt()
 {
     CutlistAtDialog dlg(this);
-    if (dlg.exec() == QDialog::Accepted && !dlg.culData().isEmpty())
-        loadCulFromData(dlg.culData(), dlg.culName());
+    if (dlg.exec() != QDialog::Accepted || dlg.culData().isEmpty())
+        return;
+
+    const QString name = dlg.culName();
+    const CulFile cul = parseCul(QString::fromUtf8(dlg.culData()));
+    const QString target = cul.generalValue(QStringLiteral("ApplyToFile"));
+    const QString culName = !target.isEmpty() ? target : name;
+    const QDate airDate = dlg.airDate();
+
+    // 1) a video is open: match it against the recording the CUL was made for
+    if (m_player->isOpen()) {
+        if (RecordingMatcher::matches(QFileInfo(m_path).fileName(), culName,
+                                      airDate)) {
+            applyCul(cul, name);
+            return;
+        }
+        const bool ok = QMessageBox::question(
+            this, tr("Apply cutlist?"),
+            tr("This cutlist was created for the recording “%1”.\n"
+               "Apply it to the open video “%2” anyway?")
+                .arg(culName)
+                .arg(QFileInfo(m_path).fileName()),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        if (ok)
+            applyCul(cul, name);
+        return;
+    }
+
+    // 2) no video open: look for the recording in a folder
+    static QString s_folder;
+    if (!s_folder.isEmpty() && !QFileInfo(s_folder).isDir())
+        s_folder.clear();
+    if (s_folder.isEmpty()) {
+        s_folder =
+            QFileDialog::getExistingDirectory(this, tr("Choose your recordings folder"));
+        if (s_folder.isEmpty())
+            return;
+    }
+    const QString found =
+        RecordingMatcher::bestMatch(QDir(s_folder), culName, airDate, 1.0);
+
+    QString videoPath;
+    if (!found.isEmpty()) {
+        const bool ok = QMessageBox::question(
+            this, tr("Recording found"),
+            tr("The cutlist matches the recording “%1”.\n"
+               "Open it and apply the cutlist?")
+                .arg(QFileInfo(found).fileName()),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+        if (ok)
+            videoPath = found;
+    }
+    if (videoPath.isEmpty()) {
+        videoPath = QFileDialog::getOpenFileName(
+            this, tr("Open recording"), QString(),
+            tr("Video (*.ts *.m2ts *.avi *.mpg *.mpeg *.mkv *.mov "
+               "*.mp4);;All files (*)"));
+    }
+    if (videoPath.isEmpty())
+        return;
+
+    openVideo(videoPath);
+    applyCul(cul, name);
 }
 
 void MainWindow::loadProjectFile(const QString& path)

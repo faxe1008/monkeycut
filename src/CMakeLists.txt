@@ -38,6 +38,8 @@ add_library(monkeycut STATIC
   ui/CutlistAtDialog.h
   net/CutlistAtClient.cpp
   net/CutlistAtClient.h
+  cut/RecordingMatcher.cpp
+  cut/RecordingMatcher.h
 )
 target_include_directories(monkeycut PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(monkeycut PUBLIC

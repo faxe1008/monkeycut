@@ -1,4 +1,5 @@
 #pragma once
+#include <QDate>
 
 #include <QByteArray>
 #include <QDialog>
@@ -20,6 +21,7 @@ public:
 
     const QByteArray& culData() const;
     const QString& culName() const;
+    QDate airDate() const;
 
 private slots:
     void doSearch();
@@ -46,4 +48,5 @@ private:
     qint64 m_activeId = -1;
     QByteArray m_culData;
     QString m_culName;
+    QDate m_airDate;
 };

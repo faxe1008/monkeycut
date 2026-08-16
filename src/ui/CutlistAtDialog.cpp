@@ -74,6 +74,11 @@ const QString& CutlistAtDialog::culName() const
     return m_culName;
 }
 
+QDate CutlistAtDialog::airDate() const
+{
+    return m_airDate;
+}
+
 void CutlistAtDialog::setStatus(const QString& text)
 {
     m_status->setText(text);
@@ -129,6 +134,7 @@ void CutlistAtDialog::appendResults(const SearchPage& page)
         item->setData(0, Qt::UserRole, it.id);
         item->setData(0, Qt::UserRole + 1, it.suggestedName);
         item->setData(0, Qt::UserRole + 2, it.otrkey);
+        item->setData(0, Qt::UserRole + 3, it.airDate);
     }
     // "Next page" entry at the bottom
     auto* more = new QTreeWidgetItem(m_table);
@@ -162,6 +168,11 @@ void CutlistAtDialog::onCulReady(qint64 id, const QByteArray& data)
 {
     Q_UNUSED(id)
     m_culData = data;
+    m_airDate = m_activeItem
+                    ? QDate::fromString(m_activeItem->data(0, Qt::UserRole + 3)
+                                             .toString(),
+                                         QStringLiteral("yyyy-MM-dd"))
+                    : QDate();
     m_okBtn->setEnabled(true);
     m_culName = m_activeItem
                     ? (m_activeItem->data(0, Qt::UserRole + 1).toString()

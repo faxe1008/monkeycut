@@ -227,7 +227,31 @@ private slots:
         QVERIFY(!loadProject(path, &q, &err));
         QVERIFY(!err.isEmpty());
     }
+
+    void culFpsConversion()
+    {
+        // a 50 fps CUL applied to a 25 fps recording: frames halve
+        CulFile cul;
+        cul.general[QStringLiteral("FramesPerSecond")] = QStringLiteral("50");
+        CulFile::CutSeg seg;
+        seg.startFrame = 100; // = 2.0 s at 50 fps
+        seg.startSec = 2.0;
+        seg.durationFrames = 50; // = 1.0 s
+        seg.durationSec = 1.0;
+        cul.cuts.append(seg);
+
+        Cutlist at50 = culToCutlist(cul);
+        QCOMPARE(at50.cuts().size(), 1);
+        QCOMPARE(at50.cuts()[0].inFrame, qint64(100));
+        QCOMPARE(at50.cuts()[0].outFrame, qint64(150));
+
+        Cutlist at25 = culToCutlist(cul, 25.0);
+        QCOMPARE(at25.cuts().size(), 1);
+        QCOMPARE(at25.cuts()[0].inFrame, qint64(50));
+        QCOMPARE(at25.cuts()[0].outFrame, qint64(75));
+    }
 };
+
 
 QTEST_MAIN(TCut)
 

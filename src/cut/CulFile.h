@@ -48,8 +48,10 @@ CulFile parseCul(const QString& text);
 bool loadCul(const QString& path, CulFile* out, QString* error = nullptr);
 bool saveCul(const QString& path, const CulFile& file, QString* error = nullptr);
 
-// Conversion: CUL keep segments -> Cutlist keep-ranges (frames)
-Cutlist culToCutlist(const CulFile&);
+// Conversion: CUL keep segments -> Cutlist keep-ranges (frames).
+// When targetFps differs from the CUL's own rate, frame positions are
+// converted via seconds (a 50 fps CUL applied to a 25 fps recording).
+Cutlist culToCutlist(const CulFile& cul, double targetFps = -1.0);
 
 // Reverse: keep-ranges -> CUL (fps from the media, times derived from frames)
 CulFile cutlistToCul(const Cutlist& cutlist, Fps fps, const QString& applyToFile,
