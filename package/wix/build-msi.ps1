@@ -43,47 +43,51 @@ $files = Get-ChildItem $stage -Recurse -File | Sort-Object FullName
 $xml = New-Object System.Text.StringBuilder
 [void]$xml.AppendLine('<?xml version="1.0" encoding="utf-8"?>')
 [void]$xml.AppendLine('<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">')
-[void]$xml.AppendLine('  <MajorUpgrade DowngradeErrorMessage="A newer version of MonkeyCut is already installed." />')
-[void]$xml.AppendLine('  <Package Name="MonkeyCut" Manufacturer="faxe1008" Version="' + $Version + '" UpgradeCode="' + $upgradeGuid + '" Description="Ad-free TV recordings - stream-copy video cutter" />')
-[void]$xml.AppendLine('  <Property Id="ProductCode" Value="' + $productGuid + '" />')
-[void]$xml.AppendLine('  <StandardDirectory Id="ProgramFiles6432Folder">')
-[void]$xml.AppendLine('    <Directory Id="APPDIR" Name="MonkeyCut">')
+[void]$xml.AppendLine('  <Package Name="MonkeyCut" Manufacturer="faxe1008" Version="' + $Version + '" UpgradeCode="' + $upgradeGuid + '" ProductCode="' + $productGuid + '">')
+[void]$xml.AppendLine('    <MajorUpgrade DowngradeErrorMessage="A newer version of MonkeyCut is already installed." />')
+[void]$xml.AppendLine('    <StandardDirectory Id="ProgramFiles6432Folder">')
+[void]$xml.AppendLine('      <Directory Id="APPDIR" Name="MonkeyCut">')
 
 $componentIds = @()
 foreach ($f in $files) {
     $rel = $f.FullName.Substring($stage.Length + 1).Replace('\', '/')
     $id = "F_" + ($rel -replace '[^0-9A-Za-z]', '_')
     $guid = New-DeterministicGuid "monkeycut-file-$rel"
-    [void]$xml.AppendLine('      <Component Id="' + $id + '" Guid="' + $guid + '">')
-    [void]$xml.AppendLine('        <File Source="' + $f.FullName + '" />')
-    [void]$xml.AppendLine('      </Component>')
+    [void]$xml.AppendLine('        <Component Id="' + $id + '" Guid="' + $guid + '">')
+    [void]$xml.AppendLine('          <File Source="' + $f.FullName + '" />')
+    [void]$xml.AppendLine('        </Component>')
     $componentIds += $id
 }
 
-[void]$xml.AppendLine('    </Directory>')
-[void]$xml.AppendLine('  </StandardDirectory>')
+[void]$xml.AppendLine('      </Directory>')
+[void]$xml.AppendLine('    </StandardDirectory>')
 
-[void]$xml.AppendLine('  <StandardDirectory Id="ProgramMenuFolder">')
-[void]$xml.AppendLine('    <Directory Id="APPSTARTMENU" Name="MonkeyCut">')
-[void]$xml.AppendLine('      <Component Id="ShortcutStartMenuDir" Guid="' + $startMenuGuid + '">')
-[void]$xml.AppendLine('        <Shortcut Id="StartMenuShortcut" Name="MonkeyCut" Target="[APPDIR]monkeycut.exe" WorkingDirectory="APPDIR" />')
+[void]$xml.AppendLine('    <StandardDirectory Id="ProgramMenuFolder">')
+[void]$xml.AppendLine('      <Directory Id="APPSTARTMENU" Name="MonkeyCut">')
+[void]$xml.AppendLine('        <Component Id="ShortcutStartMenuDir" Guid="' + $startMenuGuid + '">')
+[void]$xml.AppendLine('          <CreateFolder />')
+[void]$xml.AppendLine('          <Shortcut Id="StartMenuShortcut" Name="MonkeyCut" Target="[APPDIR]monkeycut.exe" WorkingDirectory="APPDIR" />')
+[void]$xml.AppendLine('          <RemoveFolder Id="RemoveAppStartMenu" Directory="APPSTARTMENU" On="uninstall" />')
+[void]$xml.AppendLine('          <RegistryValue Root="HKCU" Key="Software\MonkeyCut" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />')
+[void]$xml.AppendLine('        </Component>')
+[void]$xml.AppendLine('      </Directory>')
+[void]$xml.AppendLine('    </StandardDirectory>')
+
+[void]$xml.AppendLine('    <StandardDirectory Id="DesktopFolder">')
+[void]$xml.AppendLine('      <Component Id="ShortcutDesktop" Guid="' + $desktopGuid + '">')
+[void]$xml.AppendLine('        <Shortcut Id="DesktopShortcut" Name="MonkeyCut" Target="[APPDIR]monkeycut.exe" WorkingDirectory="APPDIR" />')
+[void]$xml.AppendLine('        <RegistryValue Root="HKCU" Key="Software\MonkeyCut" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />')
 [void]$xml.AppendLine('      </Component>')
-[void]$xml.AppendLine('    </Directory>')
-[void]$xml.AppendLine('  </StandardDirectory>')
+[void]$xml.AppendLine('    </StandardDirectory>')
 
-[void]$xml.AppendLine('  <StandardDirectory Id="DesktopFolder">')
-[void]$xml.AppendLine('    <Component Id="ShortcutDesktop" Guid="' + $desktopGuid + '">')
-[void]$xml.AppendLine('      <Shortcut Id="DesktopShortcut" Name="MonkeyCut" Target="[APPDIR]monkeycut.exe" WorkingDirectory="APPDIR" />')
-[void]$xml.AppendLine('    </Component>')
-[void]$xml.AppendLine('  </StandardDirectory>')
-
-[void]$xml.AppendLine('  <Feature Id="Main" Title="MonkeyCut" Level="1">')
+[void]$xml.AppendLine('    <Feature Id="Main" Title="MonkeyCut" Level="1">')
 foreach ($id in $componentIds) {
-    [void]$xml.AppendLine('    <ComponentRef Id="' + $id + '" />')
+    [void]$xml.AppendLine('      <ComponentRef Id="' + $id + '" />')
 }
-[void]$xml.AppendLine('    <ComponentRef Id="ShortcutStartMenuDir" />')
-[void]$xml.AppendLine('    <ComponentRef Id="ShortcutDesktop" />')
-[void]$xml.AppendLine('  </Feature>')
+[void]$xml.AppendLine('      <ComponentRef Id="ShortcutStartMenuDir" />')
+[void]$xml.AppendLine('      <ComponentRef Id="ShortcutDesktop" />')
+[void]$xml.AppendLine('    </Feature>')
+[void]$xml.AppendLine('  </Package>')
 [void]$xml.AppendLine('</Wix>')
 
 $workDir = Join-Path $PSScriptRoot "..\..\.wix-build"
