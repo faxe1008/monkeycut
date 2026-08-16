@@ -42,7 +42,7 @@ $files = Get-ChildItem $stage -Recurse -File | Sort-Object FullName
 
 $xml = New-Object System.Text.StringBuilder
 [void]$xml.AppendLine('<?xml version="1.0" encoding="utf-8"?>')
-[void]$xml.AppendLine('<Wix xmlns="http://wix.toolset.org/schema/wix/v4">')
+[void]$xml.AppendLine('<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">')
 [void]$xml.AppendLine('  <MajorUpgrade DowngradeErrorMessage="A newer version of MonkeyCut is already installed." />')
 [void]$xml.AppendLine('  <Package Name="MonkeyCut" Manufacturer="faxe1008" Version="' + $Version + '" UpgradeCode="' + $upgradeGuid + '" Description="Ad-free TV recordings - stream-copy video cutter" />')
 [void]$xml.AppendLine('  <Property Id="ProductCode" Value="' + $productGuid + '" />')
