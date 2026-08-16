@@ -124,7 +124,9 @@ jobs:
           # The bare runner PATH finds MinGW first; the Qt/FFmpeg builds
           # here are MSVC x64, so run inside the vcvars64 environment.
           & .\scripts\import-vcvars.ps1 -Vcvars $env:VCVARS
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:\Qt\$env:QT_VERSION\msvc2022_64 -DFFmpeg_ROOT=$env:FFMPEG_ROOT
+          $ffroot = (Resolve-Path "ffmpeg").Path
+          if (-not (Test-Path "$ffroot\include\libavcodec\avcodec.h")) { throw "FFmpeg root invalid: $ffroot" }
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:\Qt\$env:QT_VERSION\msvc2022_64 "-DFFmpeg_ROOT=$ffroot"
           if ($LASTEXITCODE -ne 0) { throw "cmake configure failed" }
 
       - name: Build
