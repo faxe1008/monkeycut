@@ -138,7 +138,7 @@ jobs:
 
       - name: Test
         shell: pwsh
-        run: >
+        run: |
           $env:QT_QPA_PLATFORM = 'offscreen'
           $env:PATH = "C:\Qt\$env:QT_VERSION\msvc2022_64\bin;$PWD\ffmpeg\bin;$env:PATH"
           ctest --test-dir build --output-on-failure
