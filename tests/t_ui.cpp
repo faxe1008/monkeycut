@@ -2,7 +2,9 @@
 #include <QElapsedTimer>
 #include <QEventLoop>
 #include <QFile>
+#include <QFileInfo>
 #include <QLabel>
+#include <QSignalSpy>
 #include <QSlider>
 #include <QTableWidget>
 #include <QTemporaryDir>
@@ -10,7 +12,9 @@
 
 #include <functional>
 
+#include "av/AvProbe.h"
 #include "av/Player.h"
+#include "cut/CuttingEngine.h"
 #include "ui/MainWindow.h"
 #include "ui/VideoView.h"
 
@@ -197,6 +201,85 @@ private slots:
                 && table->item(0, 2)->text() == QLatin1String("00:00:02:20");
         }));
         QCOMPARE(table->item(0, 1)->text(), QLatin1String("00:00:00:10"));
+
+        w.close();
+    }
+
+    void test_exportCuts()
+    {
+        if (!FfmpegFixture::available())
+            QSKIP("ffmpeg binary not available");
+
+        QTemporaryDir tmp;
+        QDir tmpDir(tmp.path());
+        const QString video = FfmpegFixture::createTestVideo(
+            tmpDir,
+            QStringLiteral("ui3.ts"),
+            {
+                QStringLiteral("-c:v"), QStringLiteral("mpeg2video"),
+                QStringLiteral("-g"), QStringLiteral("25"),
+                QStringLiteral("-c:a"), QStringLiteral("mp2"),
+                QStringLiteral("-b:a"), QStringLiteral("128k"),
+            });
+        QVERIFY(!video.isEmpty());
+
+        MainWindow w;
+        w.show();
+        QCoreApplication::processEvents();
+        w.openVideo(video);
+        QVERIFY(waitUntil([&] {
+            for (auto* v : w.findChildren<VideoView*>())
+                if (v->hasFrame())
+                    return true;
+            return false;
+        }));
+
+        QTableWidget* table = nullptr;
+        for (auto* t : w.findChildren<QTableWidget*>())
+            table = t;
+        QVERIFY(table != nullptr);
+
+        // keep [0,30) and [50,80)
+        w.seekToFrame(0);
+        QTest::keyClick(&w, Qt::Key_I);
+        w.seekToFrame(30);
+        QVERIFY(waitUntil([&] {
+            for (auto* p : w.findChildren<Player*>())
+                if (p->currentFrame() == 30)
+                    return true;
+            return false;
+        }));
+        QTest::keyClick(&w, Qt::Key_O);
+        w.seekToFrame(50);
+        QVERIFY(waitUntil([&] {
+            for (auto* p : w.findChildren<Player*>())
+                if (p->currentFrame() == 50)
+                    return true;
+            return false;
+        }));
+        QTest::keyClick(&w, Qt::Key_I);
+        w.seekToFrame(80);
+        QVERIFY(waitUntil([&] {
+            for (auto* p : w.findChildren<Player*>())
+                if (p->currentFrame() == 80)
+                    return true;
+            return false;
+        }));
+        QTest::keyClick(&w, Qt::Key_O);
+        QVERIFY(waitUntil([&] { return table->rowCount() == 2; }));
+
+        const QString output = tmpDir.filePath(QStringLiteral("ui3_cut.ts"));
+        QVERIFY(w.startExport(output));
+        const auto engines = w.findChildren<CuttingEngine*>();
+        QCOMPARE(engines.size(), 1);
+        QSignalSpy spy(engines.first(), &CuttingEngine::finished);
+        QCOMPARE(spy.wait(60000), true);
+        QCOMPARE(spy.first().at(0).toBool(), true);
+
+        QVERIFY(QFileInfo(output).exists());
+        const MediaInfo info = AvProbe{}.probe(output);
+        QVERIFY2(info.ok, qPrintable(info.error));
+        QCOMPARE(info.totalFrames, qint64(60));
 
         w.close();
     }

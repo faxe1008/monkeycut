@@ -16,6 +16,7 @@ class QAction;
 class Player;
 class VideoView;
 class TimelineBar;
+class CuttingEngine;
 
 class MainWindow : public QMainWindow
 {
@@ -30,6 +31,7 @@ public:
     void loadCulFile(const QString& path);
     void loadProjectFile(const QString& path);
     void seekToFrame(qint64 frame);
+    bool startExport(const QString& outputPath);
 
 protected:
     void dragEnterEvent(QDragEnterEvent* event) override;
@@ -46,6 +48,7 @@ private slots:
     void markOut();
     void deleteSelectedCut();
     void clearCuts();
+    void exportVideo();
     void updatePosition(qint64 frame);
     void updateState(Player::State state);
     void updateSpeed();
@@ -70,6 +73,7 @@ private:
     QComboBox* m_speedBox = nullptr;
     TimelineBar* m_timeline = nullptr;
     QTableWidget* m_cutTable = nullptr;
+    CuttingEngine* m_engine = nullptr;
 
     QString m_path;
     MediaInfo m_info;

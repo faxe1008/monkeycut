@@ -3,7 +3,9 @@
 #include "av/AvProbe.h"
 #include "av/GopScanner.h"
 #include "av/Player.h"
+#include "core/CutPlanner.h"
 #include "core/TimeCode.h"
+#include "cut/CuttingEngine.h"
 #include "cut/CulFile.h"
 #include "cut/Project.h"
 #include "ui/TimelineBar.h"
@@ -64,6 +66,10 @@ void MainWindow::buildUi()
     auto* saveProjAct = fileMenu->addAction(tr("Save &project…"), this,
                                             &MainWindow::saveProject);
     saveProjAct->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_S));
+    fileMenu->addSeparator();
+    auto* exportAct = fileMenu->addAction(tr("&Export video…"), this,
+                                          &MainWindow::exportVideo);
+    exportAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
     fileMenu->addSeparator();
     fileMenu->addAction(tr("&Quit"), this, &QWidget::close);
 
@@ -391,6 +397,60 @@ void MainWindow::openProject()
     if (path.isEmpty())
         return;
     loadProjectFile(path);
+}
+
+void MainWindow::exportVideo()
+{
+    if (!m_player->isOpen())
+        return;
+    if (m_cutlist.cuts().isEmpty()) {
+        showInfo(tr("Nothing to export – no cut ranges yet."));
+        return;
+    }
+    const QFileInfo fi(m_path);
+    const QString suggested =
+        fi.baseName() + QStringLiteral("_cut.") + fi.suffix();
+    const QString path = QFileDialog::getSaveFileName(
+        this, tr("Export video"), suggested,
+        tr("Video (%1);;All files (*)").arg(QStringLiteral("*.") + fi.suffix()));
+    if (path.isEmpty())
+        return;
+    startExport(path);
+}
+
+bool MainWindow::startExport(const QString& outputPath)
+{
+    if (!m_player->isOpen())
+        return false;
+    if (m_cutlist.cuts().isEmpty())
+        return false;
+    if (m_engine) {
+        showInfo(tr("An export is already running."));
+        return false;
+    }
+    const PlanResult plan =
+        planCuts(m_cutlist.cuts(), m_gop, m_player->totalFrames());
+    if (!plan.ok || plan.segments.isEmpty()) {
+        showError(tr("Nothing to export for the selected cut ranges."));
+        return false;
+    }
+    m_player->pause();
+    m_engine = new CuttingEngine(this);
+    connect(m_engine, &CuttingEngine::progress, this,
+            [this](qint64 done, qint64 total) {
+                statusBar()->showMessage(
+                    tr("Exporting… %1 / %2").arg(done).arg(total));
+            });
+    connect(m_engine, &CuttingEngine::finished, this,
+            [this, outputPath](bool ok, const QString& message) {
+                statusBar()->clearMessage();
+                m_engine = nullptr;
+                if (ok)
+                    showInfo(tr("Export complete: %1").arg(outputPath));
+                else
+                    showError(tr("Export failed: %1").arg(message));
+            });
+    return m_engine->start(m_path, outputPath, plan.segments, m_player->fps());
 }
 
 void MainWindow::markIn()

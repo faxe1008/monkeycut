@@ -11,6 +11,8 @@ add_library(monkeycut STATIC
   cut/CulFile.h
   cut/Project.cpp
   cut/Project.h
+  cut/CuttingEngine.cpp
+  cut/CuttingEngine.h
   av/AvProbe.cpp
   av/GopScanner.cpp
   av/GopScanner.h
