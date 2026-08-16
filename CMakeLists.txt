@@ -39,7 +39,7 @@ find_program(LRELEASE_EXECUTABLE NAMES lrelease lrelease6 lrelease-qt6
 # lupdate/lrelease must be usable (mixed Qt versions break them)
 set(MC_I18N_TOOLS_OK ON)
 if(LRELEASE_EXECUTABLE)
-  execute_process(COMMAND ${LRELEASE_EXECUTABLE} --version
+  execute_process(COMMAND ${LRELEASE_EXECUTABLE} -version
                   RESULT_VARIABLE _lrc OUTPUT_QUIET
                   ERROR_VARIABLE _lrc)
   if(NOT _lrc EQUAL 0)
@@ -59,12 +59,16 @@ endif()
 
 if(MC_I18N_TOOLS_OK)
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/translations")
-add_custom_command(
-  OUTPUT ${MC_QM_FILES}
-  COMMAND ${LRELEASE_EXECUTABLE} ${MC_TS_FILES}
-          -qmoutdir ${CMAKE_CURRENT_BINARY_DIR}/translations
-  DEPENDS ${MC_TS_FILES}
-  COMMENT "Compiling translations (lrelease)")
+# Qt 6.11+: lrelease takes one -qm output per invocation
+foreach(lang IN LISTS MC_I18N_LANGUAGES)
+  add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/translations/monkeycut_${lang}.qm
+    COMMAND ${LRELEASE_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/translations/monkeycut_${lang}.ts
+            -qm ${CMAKE_CURRENT_BINARY_DIR}/translations/monkeycut_${lang}.qm
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/translations/monkeycut_${lang}.ts
+    COMMENT "Compiling ${lang} translations (lrelease)")
+endforeach()
 add_custom_target(monkeycut_translations DEPENDS ${MC_QM_FILES})
 
 # ship the .qm files in a Qt resource: :/i18n/monkeycut_<lang>.qm
@@ -79,14 +83,13 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/monkeycut_i18n.qrc"
 ${MC_QRC_ENTRIES}  </resource>
 </RCC>
 ")
-qt6_add_resources(MC_I18N_RESOURCE_SRC monkeycut_i18n.qrc)
 endif()  # MC_I18N_TOOLS_OK
 
 
 add_subdirectory(src)
 
 if(MC_I18N_TOOLS_OK)
-  target_sources(monkeycut PRIVATE ${MC_I18N_RESOURCE_SRC})
+  qt6_add_resources(monkeycut monkeycut_i18n.qrc)
   add_dependencies(monkeycut monkeycut_translations)
   if(NOT LUPDATE_EXECUTABLE)
     message(WARNING "lupdate not found - monkeycut_lupdate target unavailable")
