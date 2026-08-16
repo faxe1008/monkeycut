@@ -1,0 +1,17 @@
+add_library(test_fixtures STATIC fixtures.cpp fixtures.h)
+target_include_directories(test_fixtures PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(test_fixtures PUBLIC Qt6::Core Qt6::Gui)
+
+function(add_monkeycut_test name)
+  add_executable(${name} ${name}.cpp)
+  target_link_libraries(${name} PRIVATE monkeycut test_fixtures Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test)
+  add_test(NAME ${name} COMMAND ${name})
+  set_tests_properties(${name} PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+endfunction()
+
+add_monkeycut_test(t_smoke)
+add_monkeycut_test(t_time)
+add_monkeycut_test(t_probe)
+add_monkeycut_test(t_gop)
+add_monkeycut_test(t_player)

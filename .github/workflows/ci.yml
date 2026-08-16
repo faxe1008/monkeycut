@@ -1,0 +1,89 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+env:
+  QT_VERSION: "6.9.2"
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build pkg-config \
+            libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev \
+            libglib2.0-0t64 libgl1 libegl1 libfontconfig1 libdbus-1-3 libxkbcommon0
+
+      - name: Qt (official desktop archive)
+        uses: actions/cache@v4
+        id: qt-cache
+        with:
+          path: qt
+          key: linux-qt-${{ env.QT_VERSION }}
+      - if: steps.qt-cache.outputs.cache-hit != 'true'
+        name: Qt download
+        run: |
+          curl -fL -o qt.7z https://download.qt.io/official_releases/qt/6.9/6.9.2/qt-everywhere-linux-x86_64-6.9.2.7z
+          7z x qt.7z -oqt -y > /dev/null
+
+      - name: Configure
+        run: >
+          cmake -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH=$PWD/qt
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Qt (official desktop archive)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path qt)) {
+            curl.exe -fL -o qt.7z https://download.qt.io/official_releases/qt/6.9/6.9.2/qt-everywhere-windows-desktop-6.9.2.7z
+            7z.exe x qt.7z -oqt -y | Out-Null
+          }
+
+      - name: FFmpeg (gyan.dev shared build)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path ffmpeg)) {
+            curl.exe -fL -o ffmpeg.7z https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.7z
+            7z.exe x ffmpeg.7z -ofull -y | Out-Null
+            $src = Get-ChildItem -Path . -Filter ffmpeg-master-latest-win64-gpl -Directory
+            Move-Item $src.FullName ffmpeg
+          }
+
+      - name: Configure
+        shell: pwsh
+        run: >
+          cmake -B build -G "Ninja Multi-Config"
+          -DCMAKE_PREFIX_PATH=$PWD/qt
+          -DFFmpeg_ROOT=$PWD/ffmpeg
+        env:
+          CMAKE_PROGRAM_PATH: ${{ github.workspace }}\qt\Tools\Ninja
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build build --config Release
+
+      - name: Test
+        shell: pwsh
+        run: >
+          $env:QT_QPA_PLATFORM = 'offscreen'
+          $env:PATH = "$env:GITHUB_WORKSPACE\qt\Tools\windeployqt;$env:PATH"
+          ctest --test-dir build -C Release --output-on-failure
