@@ -91,7 +91,7 @@ if (Test-Path $workDir) { Remove-Item $workDir -Recurse -Force }
 New-Item -ItemType Directory $workDir | Out-Null
 
 $wxsPath = Join-Path $workDir "monkeycut.wxs"
-$xml.Save($wxsPath)
+[System.IO.File]::WriteAllText($wxsPath, $xml.ToString(), [System.Text.Encoding]::UTF8)
 
 & $Wix build $wxsPath
 if ($LASTEXITCODE -ne 0) { throw "wix build failed" }
