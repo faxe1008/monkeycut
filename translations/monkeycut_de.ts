@@ -2,7 +2,81 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="de_DE">
 <context>
-    <name>QObject</name>
+    <name>CutlistAtDialog</name>
+    <message>
+        <source>cutlist.at</source>
+        <translation>cutlist.at</translation>
+    </message>
+    <message>
+        <source>Show or episode name…</source>
+        <translation>Serie oder Episodenname…</translation>
+    </message>
+    <message>
+        <source>Search</source>
+        <translation>Suchen</translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation>Name</translation>
+    </message>
+    <message>
+        <source>Channel</source>
+        <translation>Sender</translation>
+    </message>
+    <message>
+        <source>Air date</source>
+        <translation>Ausstrahlung</translation>
+    </message>
+    <message>
+        <source>Qual.</source>
+        <translation>Qual.</translation>
+    </message>
+    <message>
+        <source>Cuts</source>
+        <translation>Schnitte</translation>
+    </message>
+    <message>
+        <source>Duration</source>
+        <translation>Länge</translation>
+    </message>
+    <message>
+        <source>Search the cutlist.at database. Double-click a result to download its CUL file.
+Note: the site is HTTP-only, so the transfer is not encrypted.</source>
+        <translation>Suche in der cutlist.at-Datenbank. Doppelklick auf ein Ergebnis lädt dessen CUL-Datei herunter.
+Hinweis: Die Seite ist HTTP-only – die Übertragung ist nicht verschlüsselt.</translation>
+    </message>
+    <message>
+        <source>Searching “%1”…</source>
+        <translation>Suche „%1“…</translation>
+    </message>
+    <message>
+        <source>No cutlists found for “%1”.</source>
+        <translation>Keine Schnittlisten für „%1“ gefunden.</translation>
+    </message>
+    <message>
+        <source>%1 cutlists found for “%2”. Double-click to download.</source>
+        <translation>%1 Schnittlisten für „%2“ gefunden. Doppelklick zum Herunterladen.</translation>
+    </message>
+    <message>
+        <source>… load more …</source>
+        <translation>… mehr laden …</translation>
+    </message>
+    <message>
+        <source>… no more results …</source>
+        <translation>… keine weiteren Ergebnisse …</translation>
+    </message>
+    <message>
+        <source>Downloading cutlist “%1”…</source>
+        <translation>Schnittliste „%1“ wird heruntergeladen…</translation>
+    </message>
+    <message>
+        <source>Cutlist “%1” downloaded – click OK to apply it to the open video.</source>
+        <translation>Schnittliste „%1“ geladen – OK klicken, um sie auf das geöffnete Video anzuwenden.</translation>
+    </message>
+    <message>
+        <source>cutlist.at error: %1</source>
+        <translation>cutlist.at-Fehler: %1</translation>
+    </message>
 </context>
 <context>
     <name>MainWindow</name>
@@ -332,101 +406,6 @@ Open it and apply the cutlist?</source>
     </message>
 </context>
 <context>
-    <name>TimelineBar</name>
-    <message>
-        <source>Klicken/Vorziehen zum Springen</source>
-        <translation type="unfinished"/>
-    </message>
-    <message>
-        <source>Kein Video geöffnet</source>
-        <translation type="unfinished"/>
-    </message>
-</context>
-<context>
-    <name>VideoView</name>
-    <message>
-        <source>Kein Video</source>
-        <translation type="unfinished"/>
-    </message>
-</context>
-<context>
-    <name>CutlistAtDialog</name>
-    <message>
-        <source>cutlist.at</source>
-        <translation>cutlist.at</translation>
-    </message>
-    <message>
-        <source>Show or episode name…</source>
-        <translation>Serie oder Episodenname…</translation>
-    </message>
-    <message>
-        <source>Search</source>
-        <translation>Suchen</translation>
-    </message>
-    <message>
-        <source>Name</source>
-        <translation>Name</translation>
-    </message>
-    <message>
-        <source>Channel</source>
-        <translation>Sender</translation>
-    </message>
-    <message>
-        <source>Air date</source>
-        <translation>Ausstrahlung</translation>
-    </message>
-    <message>
-        <source>Qual.</source>
-        <translation>Qual.</translation>
-    </message>
-    <message>
-        <source>Cuts</source>
-        <translation>Schnitte</translation>
-    </message>
-    <message>
-        <source>Duration</source>
-        <translation>Länge</translation>
-    </message>
-    <message>
-        <source>Search the cutlist.at database. Double-click a result to download its CUL file.
-Note: the site is HTTP-only, so the transfer is not encrypted.</source>
-        <translation>Suche in der cutlist.at-Datenbank. Doppelklick auf ein Ergebnis lädt dessen CUL-Datei herunter.
-Hinweis: Die Seite ist HTTP-only – die Übertragung ist nicht verschlüsselt.</translation>
-    </message>
-    <message>
-        <source>Searching “%1”…</source>
-        <translation>Suche „%1“…</translation>
-    </message>
-    <message>
-        <source>No cutlists found for “%1”.</source>
-        <translation>Keine Schnittlisten für „%1“ gefunden.</translation>
-    </message>
-    <message>
-        <source>%1 cutlists found for “%2”. Double-click to download.</source>
-        <translation>%1 Schnittlisten für „%2“ gefunden. Doppelklick zum Herunterladen.</translation>
-    </message>
-    <message>
-        <source>… load more …</source>
-        <translation>… mehr laden …</translation>
-    </message>
-    <message>
-        <source>… no more results …</source>
-        <translation>… keine weiteren Ergebnisse …</translation>
-    </message>
-    <message>
-        <source>Downloading cutlist “%1”…</source>
-        <translation>Schnittliste „%1“ wird heruntergeladen…</translation>
-    </message>
-    <message>
-        <source>Cutlist “%1” downloaded – click OK to apply it to the open video.</source>
-        <translation>Schnittliste „%1“ geladen – OK klicken, um sie auf das geöffnete Video anzuwenden.</translation>
-    </message>
-    <message>
-        <source>cutlist.at error: %1</source>
-        <translation>cutlist.at-Fehler: %1</translation>
-    </message>
-</context>
-<context>
     <name>SettingsDialog</name>
     <message>
         <source>Settings</source>
@@ -451,6 +430,24 @@ Hinweis: Die Seite ist HTTP-only – die Übertragung ist nicht verschlüsselt.<
     <message>
         <source>cutlist.at server:</source>
         <translation>cutlist.at-Server:</translation>
+    </message>
+</context>
+<context>
+    <name>TimelineBar</name>
+    <message>
+        <source>Klicken/Vorziehen zum Springen</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Kein Video geöffnet</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>VideoView</name>
+    <message>
+        <source>Kein Video</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 </TS>
