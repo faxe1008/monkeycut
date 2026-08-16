@@ -44,6 +44,7 @@ protected:
 private slots:
     void openFile();
     void searchCutlistAt();
+    void showSettings();
     void openProject();
     void saveCutlist();
     void saveProject();

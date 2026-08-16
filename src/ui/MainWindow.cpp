@@ -10,6 +10,7 @@
 #include "cut/Project.h"
 #include "cut/RecordingMatcher.h"
 #include "ui/CutlistAtDialog.h"
+#include "ui/SettingsDialog.h"
 #include "ui/TimelineBar.h"
 #include "ui/VideoView.h"
 
@@ -73,6 +74,7 @@ void MainWindow::buildUi()
                                           &MainWindow::exportVideo);
     exportAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
     fileMenu->addSeparator();
+    fileMenu->addAction(tr("&Settings…"), this, &MainWindow::showSettings);
     fileMenu->addAction(tr("&Quit"), this, &QWidget::close);
 
     auto* clMenu = menuBar()->addMenu(tr("&cutlist.at"));
@@ -338,6 +340,12 @@ void MainWindow::applyCul(const CulFile& cul, const QString& sourceName)
     showInfo(tr("Cutlist loaded: %1 keep-ranges from “%2” (replacing current).")
                  .arg(l.cuts().size())
                  .arg(sourceName));
+}
+
+void MainWindow::showSettings()
+{
+    SettingsDialog dlg(this);
+    dlg.exec();
 }
 
 void MainWindow::searchCutlistAt()

@@ -7,6 +7,7 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
+#include <QSettings>
 #include <QPushButton>
 #include <QTreeWidget>
 #include <QVBoxLayout>
@@ -17,6 +18,13 @@ CutlistAtDialog::CutlistAtDialog(QWidget* parent)
     setWindowTitle(tr("cutlist.at"));
 
     m_client = new CutlistAtClient(this);
+    {
+        QSettings s;
+        const QString url = s.value(QStringLiteral("ui/cutlistatBaseURL"),
+                                    QStringLiteral("http://cutlist.at")).toString();
+        if (!url.isEmpty())
+            m_client->setBaseUrl(QUrl(url));
+    }
     connect(m_client, &CutlistAtClient::searchResults, this,
             &CutlistAtDialog::onResults);
     connect(m_client, &CutlistAtClient::culReady, this,

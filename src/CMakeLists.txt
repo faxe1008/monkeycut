@@ -36,6 +36,8 @@ add_library(monkeycut STATIC
   ui/TimelineBar.h
   ui/CutlistAtDialog.cpp
   ui/CutlistAtDialog.h
+  ui/SettingsDialog.cpp
+  ui/SettingsDialog.h
   net/CutlistAtClient.cpp
   net/CutlistAtClient.h
   cut/RecordingMatcher.cpp
