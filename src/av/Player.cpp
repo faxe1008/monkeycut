@@ -8,6 +8,8 @@
 #include <QTimer>
 #include <QtGlobal>
 
+#include <type_traits>
+
 namespace
 {
 constexpr int kAudioRate = 48000;
@@ -16,6 +18,37 @@ constexpr qint64 kBytesPerMs = qint64(kAudioRate) * kAudioChannels * 2 / 1000;
 constexpr int kMaxAudioMs = 1500;
 constexpr int kMaxPendingVideo = 4;
 constexpr int kSeekScanLimit = 5000;
+
+// swr_convert()'s 'in' parameter drifted across libswresample
+// releases: 'uint8_t **' (old), 'const uint8_t **' (e.g. Ubuntu) and
+// 'const uint8_t * const *' (e.g. Arch). Probe the installed header
+// instead of trusting version numbers: if it accepts a 'const
+// uint8_t **', hand it a const-pointer array (that decays to the
+// expected type and also converts to the fully-const form);
+// otherwise pass frame->data (which fits the no-const and the
+// fully-const signatures implicitly).
+template<typename InPtr, typename = void>
+constexpr bool mcSwrAcceptsIn = false;
+template<typename InPtr>
+constexpr bool mcSwrAcceptsIn<InPtr,
+    std::void_t<decltype(swr_convert(std::declval<SwrContext*>(),
+                                     std::declval<uint8_t**>(),
+                                     0,
+                                     std::declval<InPtr>(),
+                                     0))>> = true;
+
+template<bool InIsConstArray>
+int mcSwrConvert(SwrContext* s, uint8_t* outBuf, AVFrame* frame)
+{
+    if constexpr (InIsConstArray) {
+        const uint8_t* inData[AV_NUM_DATA_POINTERS];
+        for (size_t i = 0; i < AV_NUM_DATA_POINTERS; ++i)
+            inData[i] = frame->data[i];
+        return swr_convert(s, &outBuf, 1, inData, frame->nb_samples);
+    } else {
+        return swr_convert(s, &outBuf, 1, frame->data, frame->nb_samples);
+    }
+}
 }
 
 class AudioBuffer
@@ -272,28 +305,8 @@ private:
         uint8_t* outBuf = static_cast<uint8_t*>(av_malloc(cap * 2 * sizeof(int16_t)));
         if (!outBuf)
             return;
-        // swr_convert()'s 'in' parameter drifted across libswresample
-// releases: no const (4.x), 'const uint8_t **' (5.0.x), and
-// 'const uint8_t * const *' (5.1+). The 5.0.x form accepts neither
-// 'uint8_t **' nor a reinterpret of it, so copy the (read-only)
-// plane pointers into a const-pointer array whose decay yields the
-// expected type.
-#if LIBSWRESAMPLE_VERSION_INT >= AV_VERSION_INT(5, 1, 0)
-        const int outSamples = swr_convert(m_swr, &outBuf, 1,
-                                           frame->data,
-                                           frame->nb_samples);
-#elif LIBSWRESAMPLE_VERSION_INT >= AV_VERSION_INT(5, 0, 0)
-        const uint8_t* inData[AV_NUM_DATA_POINTERS];
-        for (size_t i = 0; i < AV_NUM_DATA_POINTERS; ++i)
-            inData[i] = frame->data[i];
-        const int outSamples = swr_convert(m_swr, &outBuf, 1,
-                                           inData,
-                                           frame->nb_samples);
-#else
-        const int outSamples = swr_convert(m_swr, &outBuf, 1,
-                                           frame->data,
-                                           frame->nb_samples);
-#endif
+const int outSamples = mcSwrConvert<mcSwrAcceptsIn<const uint8_t**>>(
+            m_swr, outBuf, frame);
         if (outSamples > 0) {
             qint64 ms = frame->pts != AV_NOPTS_VALUE
                 ? ptsToMs(frame->pts, ast->time_base) - m_startMs
