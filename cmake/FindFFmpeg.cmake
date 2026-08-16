@@ -32,8 +32,14 @@ if(FFMPEG_FOUND_PC)
     endif()
   endforeach()
 else()
-  find_path(FFMPEG_INCLUDE_DIR avcodec/version.h
-    HINTS ${FFmpeg_ROOT} PATH_SUFFIXES include)
+  # BtbN / vcpkg style layout: <root>/include/libavcodec/avcodec.h, ...
+  # Our sources include <libavcodec/...>, so the include root is the
+  # directory that contains the libXXX subdirectories.
+  find_path(FFMPEG_AVCODEC_HDR_DIR avcodec.h
+    HINTS ${FFmpeg_ROOT} PATH_SUFFIXES include/libavcodec)
+  if(FFMPEG_AVCODEC_HDR_DIR)
+    get_filename_component(FFMPEG_INCLUDE_DIR "${FFMPEG_AVCODEC_HDR_DIR}" DIRECTORY)
+  endif()
   foreach(_lib IN LISTS MONKEYCUT_FFMPEG_LIBS)
     find_library(FFMPEG_${_lib}_LIBRARY
       NAMES ${_lib} lib${_lib}

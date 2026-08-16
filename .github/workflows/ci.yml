@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   linux:
     runs-on: ubuntu-latest
@@ -17,7 +20,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            ninja-build pkg-config python3-pip \
+            ninja-build pkg-config python3-pip zip \
             libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev \
             libglib2.0-0t64 libgl-dev libegl1-mesa-dev \
             libfontconfig1 libdbus-1-3 libxkbcommon0
@@ -48,6 +51,15 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: ctest --test-dir build --output-on-failure
+
+      - name: Package (portable linux bundle)
+        run: bash package/package-linux.sh
+
+      - name: Upload linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: monkeycut-linux
+          path: monkeycut-linux-*.zip
 
   windows:
     runs-on: windows-latest
@@ -110,3 +122,77 @@ jobs:
           $env:QT_QPA_PLATFORM = 'offscreen'
           $env:PATH = "C:\Qt\$env:QT_VERSION\msvc2022_64\bin;$PWD\ffmpeg\bin;$env:PATH"
           ctest --test-dir build -C Release --output-on-failure
+
+      - name: Install WiX (MSI)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          # Pinned WiX toolset (v6.0.2 CLI bundle) for the MSI build.
+          curl.exe -fL -o wix-cli.msi https://github.com/wixtoolset/wix/releases/download/v6.0.2/wix-cli-x64.msi
+          msiexec /i wix-cli.msi /qn /norestart
+          if ($LASTEXITCODE -ne 0) { throw "wix MSI install failed" }
+          $wix = (Get-Command wix.exe -ErrorAction SilentlyContinue).Source
+          if (-not $wix) {
+            foreach ($c in "C:\Program Files\WiX\wix.exe", "C:\Program Files (x86)\WiX\wix.exe") {
+              if (Test-Path $c) { $wix = $c; break }
+            }
+          }
+          if (-not $wix) { $wix = (Get-ChildItem "C:\Program Files" -Depth 2 -Filter wix.exe -ErrorAction SilentlyContinue | Select-Object -First 1).FullName }
+          if (-not $wix) { throw "wix CLI not found after install" }
+          & $wix --version
+          Add-Content $env:GITHUB_ENV "WIX_EXE=$wix"
+
+      - name: Stage release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $stage = "release\monkeycut"
+          if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
+          New-Item -ItemType Directory $stage | Out-Null
+          Copy-Item build\Release\monkeycut.exe $stage
+          & "C:\Qt\$env:QT_VERSION\msvc2022_64\bin\windeployqt.exe" --no-translations --no-system-d3d-compiler --no-opengl-sw (Join-Path $stage "monkeycut.exe")
+          Copy-Item ffmpeg\bin\*.dll $stage
+          "staged files: $((Get-ChildItem $stage -Recurse -File).Count)"
+
+      - name: Build MSI
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $base = (Select-String -Path CMakeLists.txt -Pattern 'project\(\S+ VERSION (\S+)' | Select-Object -First 1).Matches[0].Groups[1].Value
+          $ver = "$base.$env:GITHUB_RUN_NUMBER"
+          New-Item -ItemType Directory -Force dist | Out-Null
+          & .\package\wix\build-msi.ps1 -StageDir release\monkeycut -Version $ver -Out "dist\monkeycut-$ver-win64.msi" -Wix $env:WIX_EXE
+
+      - name: Upload windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: monkeycut-win64
+          path: dist/monkeycut-*-win64.msi
+
+  release:
+    needs: [linux, windows]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: monkeycut-win64
+          path: dist
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: monkeycut-linux
+          path: dist
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly-${{ github.run_number }}
+          name: MonkeyCut nightly-${{ github.run_number }}
+          body: |
+            Auto-built nightly from commit ${{ github.sha }}.
+
+            - `monkeycut-*-win64.msi` — Windows x64 installer (WiX, versioned, replaces previous nightlies)
+            - `monkeycut-linux-*.zip` — Linux x64 portable bundle (extract and run `./monkeycut`)
+          files: |
+            dist/*
