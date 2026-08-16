@@ -4,13 +4,12 @@ on:
   push:
   pull_request:
 
-env:
-  QT_VERSION: "6.11.1"
-  QT_INSTALL_DIR: qt
-
 jobs:
   linux:
     runs-on: ubuntu-latest
+    env:
+      QT_VERSION: "6.11.1"
+      QT_INSTALL_DIR: qt
     steps:
       - uses: actions/checkout@v4
 
@@ -51,6 +50,11 @@ jobs:
 
   windows:
     runs-on: windows-latest
+    # aqtinstall 3.x cannot resolve Qt >= 6.9 module paths for the Windows
+    # repository layout (qt6_6111/qt6_6111_msvc2022_64 vs expected
+    # qt6_6111/qt6_6111); 6.8.x still uses the layout aqt understands.
+    env:
+      QT_VERSION: "6.8.3"
     steps:
       - uses: actions/checkout@v4
 

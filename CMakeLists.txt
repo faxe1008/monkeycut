@@ -38,12 +38,18 @@ find_program(LRELEASE_EXECUTABLE NAMES lrelease lrelease6 lrelease-qt6
 
 # lupdate/lrelease must be usable (mixed Qt versions break them)
 set(MC_I18N_TOOLS_OK ON)
-if(LRELEASE_EXECUTABLE)
+if(NOT LRELEASE_EXECUTABLE)
+  set(MC_I18N_TOOLS_OK OFF)
+  message(STATUS "lrelease not found - building without compiled translations")
+endif()
+if(MC_I18N_TOOLS_OK)
   execute_process(COMMAND ${LRELEASE_EXECUTABLE} -version
                   RESULT_VARIABLE _lrc OUTPUT_QUIET
                   ERROR_VARIABLE _lrc)
   if(NOT _lrc EQUAL 0)
     set(MC_I18N_TOOLS_OK OFF)
+    message(STATUS "lrelease unusable (${LRELEASE_EXECUTABLE}) - building "
+                   "without compiled translations")
   endif()
 endif()
 
