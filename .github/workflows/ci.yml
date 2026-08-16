@@ -71,10 +71,17 @@ jobs:
         shell: pwsh
         run: |
           py -3 -m pip install --user aqtinstall
-          # py7zr (aqt's built-in extractor) intermittently fails with
-          # Bad7zFile on the Qt 6.8.3 qtbase archive; use the runner's
-          # 7-Zip instead.
-          py -3 -m aqt install-qt windows desktop "$env:QT_VERSION" win64_msvc2022_64 -O C:\Qt -E "C:\Program Files\7-Zip\7z.exe"
+          # py7zr (aqt's built-in extractor) fails with Bad7zFile on the
+          # Qt 6.8.3 qtbase archive, so use the runner's 7-Zip. Extraction
+          # runs single-threaded: parallel 7z processes race on creating
+          # C:\Qt\...\msvc2022_64 and one of them exits non-zero, which
+          # crashes aqt in its error handling even though every archive
+          # had been extracted.
+          Set-Content -Path aqt-ci.ini -Value "[aqt]`nconcurrency = 1"
+          py -3 -m aqt -c aqt-ci.ini install-qt windows desktop "$env:QT_VERSION" win64_msvc2022_64 -O C:\Qt -E "C:\Program Files\7-Zip\7z.exe"
+          if (-not (Test-Path "C:\Qt\$env:QT_VERSION\msvc2022_64\lib\cmake\Qt6\Qt6Config.cmake")) {
+            throw "Qt installation incomplete"
+          }
 
       - name: FFmpeg (BtbN shared build)
         shell: pwsh
