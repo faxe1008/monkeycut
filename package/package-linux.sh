@@ -5,7 +5,8 @@ set -euo pipefail
 
 BUILD_DIR="${1:-build}"
 APP="$BUILD_DIR/monkeycut"
-[ -x "$APP" ] || { echo "app not found at $APP (build first)"; exit 1; }
+[ -x "$APP" ] || APP="$BUILD_DIR/src/monkeycut"
+[ -x "$APP" ] || { echo "app not found under $BUILD_DIR (build first)"; exit 1; }
 
 STAGE=$(mktemp -d)
 OUT="monkeycut-linux-$(uname -m)"

@@ -105,23 +105,27 @@ jobs:
             Move-Item $src.FullName ffmpeg
           }
 
-      - name: Configure
+      - name: Configure (MSVC + Ninja)
         shell: pwsh
-        run: >
-          cmake -B build -G "Ninja Multi-Config"
-          -DCMAKE_PREFIX_PATH=C:\Qt\$env:QT_VERSION\msvc2022_64
-          -DFFmpeg_ROOT=$PWD\ffmpeg
+        run: |
+          # The bare runner PATH finds MinGW first; the Qt/FFmpeg builds
+          # here are MSVC x64, so configure inside vcvars64.
+          $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $vcvars = Join-Path $vsPath "VC\Auxiliary\Build\vcvars64.bat"
+          if (-not (Test-Path $vcvars)) { throw "vcvars64.bat not found at $vcvars" }
+          & cmd /c "`"$vcvars`" && cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:\Qt\$env:QT_VERSION\msvc2022_64 -DFFmpeg_ROOT=$PWD\ffmpeg"
+          if ($LASTEXITCODE -ne 0) { throw "cmake configure failed" }
 
       - name: Build
         shell: pwsh
-        run: cmake --build build --config Release
+        run: cmake --build build
 
       - name: Test
         shell: pwsh
         run: >
           $env:QT_QPA_PLATFORM = 'offscreen'
           $env:PATH = "C:\Qt\$env:QT_VERSION\msvc2022_64\bin;$PWD\ffmpeg\bin;$env:PATH"
-          ctest --test-dir build -C Release --output-on-failure
+          ctest --test-dir build --output-on-failure
 
       - name: Install WiX (MSI)
         shell: pwsh
@@ -149,7 +153,9 @@ jobs:
           $stage = "release\monkeycut"
           if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
           New-Item -ItemType Directory $stage | Out-Null
-          Copy-Item build\Release\monkeycut.exe $stage
+          $exe = Get-ChildItem build -Recurse -Filter monkeycut.exe | Select-Object -First 1
+          if (-not $exe) { throw "monkeycut.exe not found under build\" }
+          Copy-Item $exe.FullName $stage
           & "C:\Qt\$env:QT_VERSION\msvc2022_64\bin\windeployqt.exe" --no-translations --no-system-d3d-compiler --no-opengl-sw (Join-Path $stage "monkeycut.exe")
           Copy-Item ffmpeg\bin\*.dll $stage
           "staged files: $((Get-ChildItem $stage -Recurse -File).Count)"
