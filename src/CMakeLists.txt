@@ -2,6 +2,15 @@ add_library(monkeycut STATIC
   core/Time.cpp
   core/MediaInfo.h
   core/GopMap.h
+  core/Cut.h
+  core/Cutlist.cpp
+  core/Cutlist.h
+  core/CutPlanner.cpp
+  core/CutPlanner.h
+  cut/CulFile.cpp
+  cut/CulFile.h
+  cut/Project.cpp
+  cut/Project.h
   av/AvProbe.cpp
   av/GopScanner.cpp
   av/GopScanner.h
