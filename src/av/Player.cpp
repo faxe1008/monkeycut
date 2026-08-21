@@ -749,8 +749,10 @@ void Player::postPosition(qint64 frame)
 {
     if (frame < 0)
         return;
-    if (m_playing.load())
-        m_clockMs = frameToMs(frame);
+    if (m_playing.load()) {
+        m_currentFrame = frame;
+        return;
+    }
     m_currentFrame = frame;
     Q_EMIT positionChanged(frame);
 }
@@ -768,6 +770,9 @@ void Player::seekFailed()
 void Player::pushPending(qint64 frame, const QImage& img)
 {
     QMutexLocker l(&m_pendingMutex);
+    if (m_playing.load() && m_pending.size() >= kMaxPendingVideo
+        && !m_pending.empty() && frame >= m_pending.back().frame)
+        return;
     while (m_pending.size() >= kMaxPendingVideo)
         m_pending.pop_front();
     m_pending.push_back({frame, img});
