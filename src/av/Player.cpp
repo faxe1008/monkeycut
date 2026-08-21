@@ -750,7 +750,7 @@ void Player::postPosition(qint64 frame)
     if (frame < 0)
         return;
     if (m_playing.load())
-        m_clockMs = frameToMs(frame);
+        return;
     m_currentFrame = frame;
     Q_EMIT positionChanged(frame);
 }
