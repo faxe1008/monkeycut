@@ -33,12 +33,51 @@ function New-DeterministicGuid([string]$seed) {
     return [Guid]::new($b).ToString("B")
 }
 
+function New-StableId([string]$prefix, [string]$seed) {
+    $sha = [System.Security.Cryptography.SHA1]::Create().ComputeHash(
+        [System.Text.Encoding]::UTF8.GetBytes($seed))
+    $hex = ([System.BitConverter]::ToString($sha)).Replace('-', '').Substring(0, 16)
+    return "$prefix$hex"
+}
+
+function Escape-Xml([string]$s) {
+    return [System.Security.SecurityElement]::Escape($s)
+}
+
 $productGuid = New-DeterministicGuid "monkeycut-product-$Version"
 $upgradeGuid = New-DeterministicGuid "monkeycut-upgrade-channel-v1"
 $startMenuGuid = New-DeterministicGuid "monkeycut-shortcut-startmenu"
 $desktopGuid = New-DeterministicGuid "monkeycut-shortcut-desktop"
 
 $files = Get-ChildItem $stage -Recurse -File | Sort-Object FullName
+
+$rootNode = [pscustomobject]@{
+    Name = ''
+    RelPath = ''
+    Children = @{}
+    Files = New-Object System.Collections.Generic.List[object]
+}
+
+foreach ($f in $files) {
+    $rel = $f.FullName.Substring($stage.Length + 1).Replace('\', '/')
+    $parts = $rel -split '/'
+    $node = $rootNode
+    $acc = @()
+    for ($i = 0; $i -lt $parts.Length - 1; $i++) {
+        $p = $parts[$i]
+        $acc += $p
+        if (-not $node.Children.ContainsKey($p)) {
+            $node.Children[$p] = [pscustomobject]@{
+                Name = $p
+                RelPath = ($acc -join '/')
+                Children = @{}
+                Files = New-Object System.Collections.Generic.List[object]
+            }
+        }
+        $node = $node.Children[$p]
+    }
+    $node.Files.Add([pscustomobject]@{ Rel = $rel; FullName = $f.FullName; Name = $parts[-1] })
+}
 
 $xml = New-Object System.Text.StringBuilder
 [void]$xml.AppendLine('<?xml version="1.0" encoding="utf-8"?>')
@@ -50,15 +89,35 @@ $xml = New-Object System.Text.StringBuilder
 [void]$xml.AppendLine('      <Directory Id="APPDIR" Name="MonkeyCut">')
 
 $componentIds = @()
-foreach ($f in $files) {
-    $rel = $f.FullName.Substring($stage.Length + 1).Replace('\', '/')
-    $id = "F_" + ($rel -replace '[^0-9A-Za-z]', '_')
-    $guid = New-DeterministicGuid "monkeycut-file-$rel"
-    [void]$xml.AppendLine('        <Component Id="' + $id + '" Guid="' + $guid + '">')
-    [void]$xml.AppendLine('          <File Source="' + $f.FullName + '" />')
-    [void]$xml.AppendLine('        </Component>')
-    $componentIds += $id
+function Emit-DirNode($node, [int]$level) {
+    $indent = '  ' * $level
+    if ($node.RelPath -ne '') {
+        $dirId = New-StableId 'D_' $node.RelPath
+        [void]$xml.AppendLine($indent + '<Directory Id="' + $dirId + '" Name="' + (Escape-Xml $node.Name) + '">')
+        $level += 1
+        $indent = '  ' * $level
+    }
+
+    foreach ($file in ($node.Files | Sort-Object Rel)) {
+        $id = New-StableId 'F_' $file.Rel
+        $guid = New-DeterministicGuid "monkeycut-file-$($file.Rel)"
+        [void]$xml.AppendLine($indent + '<Component Id="' + $id + '" Guid="' + $guid + '">')
+        [void]$xml.AppendLine($indent + '  <File Source="' + (Escape-Xml $file.FullName) + '" Name="' + (Escape-Xml $file.Name) + '" />')
+        [void]$xml.AppendLine($indent + '</Component>')
+        $script:componentIds += $id
+    }
+
+    foreach ($childName in ($node.Children.Keys | Sort-Object)) {
+        Emit-DirNode $node.Children[$childName] $level
+    }
+
+    if ($node.RelPath -ne '') {
+        $indent = '  ' * ($level - 1)
+        [void]$xml.AppendLine($indent + '</Directory>')
+    }
 }
+
+Emit-DirNode $rootNode 4
 
 [void]$xml.AppendLine('      </Directory>')
 [void]$xml.AppendLine('    </StandardDirectory>')
