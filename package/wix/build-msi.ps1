@@ -45,6 +45,7 @@ $xml = New-Object System.Text.StringBuilder
 [void]$xml.AppendLine('<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">')
 [void]$xml.AppendLine('  <Package Name="MonkeyCut" Manufacturer="faxe1008" Version="' + $Version + '" UpgradeCode="' + $upgradeGuid + '" ProductCode="' + $productGuid + '">')
 [void]$xml.AppendLine('    <MajorUpgrade DowngradeErrorMessage="A newer version of MonkeyCut is already installed." />')
+[void]$xml.AppendLine('    <MediaTemplate EmbedCab="yes" />')
 [void]$xml.AppendLine('    <StandardDirectory Id="ProgramFiles6432Folder">')
 [void]$xml.AppendLine('      <Directory Id="APPDIR" Name="MonkeyCut">')
 
