@@ -93,10 +93,12 @@ private slots:
         // a transient Playing position).
         QTest::keyClick(&w, Qt::Key_Space);
         QVERIFY(waitUntil([&] {
-            for (auto* p : w.findChildren<Player*>())
+            for (auto* p : w.findChildren<Player*>()) {
+                qWarning() << "[dbg] currentFrame=" << p->currentFrame() << "state=" << int(p->state());
                 if (p->currentFrame() >= 124
                     && p->state() != Player::State::Stopped)
                     return true;
+            }
             return false;
         }));
         // playback auto-pauses at end of file

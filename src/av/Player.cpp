@@ -233,7 +233,8 @@ private:
         return true;
     }
 
-    bool frameToScreen(AVFrame* frame, qint64 needFrame, qint64* outFrame = nullptr)
+    bool frameToScreen(AVFrame* frame, qint64 needFrame, qint64* outFrame = nullptr,
+                       bool publishPosition = true)
     {
         if (frame->width <= 0 || frame->height <= 0)
             return false;
@@ -267,8 +268,18 @@ private:
             *outFrame = fr;
         if (needFrame >= 0 && fr < needFrame)
             return false;
-        m_owner->pushPending(fr, img);
-        m_owner->postPosition(fr);
+        // Gate the display queue on the same flag as the position report:
+        // pushing a scan-only/overshoot/discarded frame here would let the
+        // UI-thread display timer (Player::displayTick, which polls the
+        // pending queue independently and on its own schedule) pick it up
+        // and momentarily show/report it as the current frame before the
+        // seek retry has a chance to clear the queue - i.e. exactly the
+        // kind of transient wrong frame that can appear to "jump backward"
+        // when stepping quickly.
+        if (publishPosition) {
+            m_owner->pushPending(fr, img);
+            m_owner->postPosition(fr);
+        }
         return true;
     }
 
@@ -349,7 +360,7 @@ const int outSamples = mcSwrConvert<mcSwrAcceptsIn<const uint8_t**>>(
             if (ts < 0)
                 ts = 0;
 
-            flushVideoQueue(vframe);
+            flushVideoQueue(vframe, /*publishPosition=*/false);
             flushAudioQueue(nullptr);
             if (m_owner->m_audioBuf)
                 m_owner->m_audioBuf->reset();
@@ -379,17 +390,45 @@ const int outSamples = mcSwrConvert<mcSwrAcceptsIn<const uint8_t**>>(
                         if (rr == AVERROR(EAGAIN) || rr < 0)
                             break;
                         qint64 fr = -1;
-                        if (frameToScreen(tmp, -1, &fr)) {
+                        // Don't publish intermediate scan frames as the
+                        // player's current position: this loop may decode
+                        // several frames (from the preceding keyframe, or
+                        // discarded overshoot attempts) before reaching the
+                        // actual requested target. Publishing them would let
+                        // a concurrently-issued stepFrame()/seekFrame() read
+                        // a stale/transient position as its base, causing
+                        // the reported frame to jump backward.
+                        if (frameToScreen(tmp, -1, &fr, /*publishPosition=*/false)) {
                             if (exact) {
-                                if (firstFrame && fr > target)
+                                if (firstFrame && fr > target) {
                                     overshoot = true;
-                                else if (fr >= target)
+                                } else if (fr >= target) {
                                     done = true;
+                                }
                             } else {
                                 done = true;
                             }
                             firstFrame = false;
-                            if (done)
+                            if (done) {
+                                // Commit the winning frame: push it to the
+                                // display queue and publish it as the
+                                // current position, now that we know it's
+                                // really the seek's final result (this
+                                // re-decodes the same already-received
+                                // AVFrame into the display queue; cheap,
+                                // since it only happens once per seek).
+                                frameToScreen(tmp, -1, nullptr, /*publishPosition=*/true);
+                                break;
+                            }
+                            // An overshoot must abandon this attempt right
+                            // away. Without this break, the loop would go
+                            // on to the *next* already-buffered frame from
+                            // this same decode call with firstFrame now
+                            // false, letting it wrongly satisfy "fr >=
+                            // target" and get reported as the seek's result
+                            // even though the whole attempt was supposed to
+                            // be discarded and retried with a bigger margin.
+                            if (overshoot)
                                 break;
                         }
                     }
@@ -410,7 +449,7 @@ const int outSamples = mcSwrConvert<mcSwrAcceptsIn<const uint8_t**>>(
             m_owner->seekFailed();
     }
 
-    void flushVideoQueue(AVFrame* vframe)
+    void flushVideoQueue(AVFrame* vframe, bool publishPosition = true)
     {
         if (!m_vc)
             return;
@@ -419,7 +458,7 @@ const int outSamples = mcSwrConvert<mcSwrAcceptsIn<const uint8_t**>>(
             const int r = avcodec_receive_frame(m_vc, vframe);
             if (r == AVERROR(EAGAIN) || r < 0)
                 break;
-            frameToScreen(vframe, -1);
+            frameToScreen(vframe, -1, nullptr, publishPosition);
         }
     }
 
@@ -620,6 +659,7 @@ void Player::close()
         m_pending.clear();
     }
     m_currentFrame = 0;
+    m_lastRequestedFrame = 0;
     m_lastShown.store(-1);
     m_state = State::Stopped;
 }
@@ -630,9 +670,7 @@ void Player::play()
         return;
     if (m_workerEof.load()) {
         m_workerEof = false;
-        m_seekTarget = 0;
-        m_exactSeek = true;
-        m_seekPending = true;
+        seekFrame(0, true);
     }
     m_clockMs = frameToMs(m_currentFrame.load());
     m_lastTickMs = m_elapsed.elapsed();
@@ -654,14 +692,22 @@ void Player::stepFrame(qint64 n)
         return;
     if (m_state == State::Playing)
         pause();
-    seekFrame(m_currentFrame.load() + n, true);
+    // Base the step on the last *requested* frame rather than the settled
+    // m_currentFrame: while a previous step's seek is still being serviced
+    // by the decode thread, m_currentFrame has not caught up yet, so using
+    // it here would compute a stale target and make rapid repeated steps
+    // (holding or repeatedly clicking next/prev frame) appear to stall or
+    // jump backward once the in-flight seek finally settles.
+    seekFrame(m_lastRequestedFrame.load() + n, true);
 }
 
 void Player::seekFrame(qint64 frame, bool exact)
 {
     if (!isOpen())
         return;
-    m_seekTarget.store(clampFrame(frame));
+    const qint64 clamped = clampFrame(frame);
+    m_lastRequestedFrame.store(clamped);
+    m_seekTarget.store(clamped);
     m_exactSeek = exact;
     m_seekPending = true;
 }

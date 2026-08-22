@@ -88,6 +88,14 @@ private:
     AudioBuffer* m_audioBuf = nullptr;
 
     std::atomic<qint64> m_currentFrame{0};
+    // Tracks the most recently requested seek/step target (which may still
+    // be in flight on the decode thread). stepFrame() bases its next target
+    // on this rather than m_currentFrame, since m_currentFrame only settles
+    // once a previously requested seek has fully completed; using it as the
+    // base while a seek is still pending would let repeated rapid steps
+    // (e.g. holding or repeatedly clicking the next/prev frame button)
+    // compute a stale/lower target and appear to jump backward.
+    std::atomic<qint64> m_lastRequestedFrame{0};
     std::atomic<qint64> m_clockMs{0};
     std::atomic<qint64> m_seekTarget{0};
     std::atomic<bool> m_seekPending{false};
