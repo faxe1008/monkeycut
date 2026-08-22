@@ -726,6 +726,16 @@ void Player::displayTick()
                     break;
                 }
             }
+            // The decode thread is allowed to read ahead of the playback
+            // clock (see the backpressure check in DecodeThread::run), so
+            // it's normal for every buffered frame to still be in the
+            // future relative to targetFrame, especially right after
+            // starting playback or seeking. Rather than stalling the
+            // display until real time catches up to a buffered frame,
+            // show the oldest (soonest-due) buffered frame so playback
+            // keeps advancing.
+            if (!show && !m_pending.empty())
+                show = &m_pending.front();
         } else if (!m_pending.empty()) {
             show = &m_pending.back();
         }
@@ -749,7 +759,12 @@ void Player::postPosition(qint64 frame)
 {
     if (frame < 0)
         return;
-    if (m_playing.load())
+    // Only resync the virtual clock here while not playing (e.g. after a
+    // seek). While playing, the clock must advance solely from wall-clock
+    // time in displayTick(); otherwise it would race ahead at decode speed
+    // instead of real time, making playback run faster than the selected
+    // speed.
+    if (!m_playing.load())
         m_clockMs = frameToMs(frame);
     m_currentFrame = frame;
     Q_EMIT positionChanged(frame);

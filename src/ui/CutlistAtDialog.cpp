@@ -42,6 +42,7 @@ CutlistAtDialog::CutlistAtDialog(QWidget* parent)
     row->addWidget(searchBtn);
 
     m_table = new QTreeWidget(this);
+    m_table->setSortingEnabled(true);
     m_table->setRootIsDecorated(false);
     m_table->setSelectionMode(QAbstractItemView::SingleSelection);
     m_table->header()->setStretchLastSection(true);
