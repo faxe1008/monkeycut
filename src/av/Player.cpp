@@ -749,7 +749,12 @@ void Player::postPosition(qint64 frame)
 {
     if (frame < 0)
         return;
-    if (m_playing.load())
+    // Only resync the virtual clock here while not playing (e.g. after a
+    // seek). While playing, the clock must advance solely from wall-clock
+    // time in displayTick(); otherwise it would race ahead at decode speed
+    // instead of real time, making playback run faster than the selected
+    // speed.
+    if (!m_playing.load())
         m_clockMs = frameToMs(frame);
     m_currentFrame = frame;
     Q_EMIT positionChanged(frame);
