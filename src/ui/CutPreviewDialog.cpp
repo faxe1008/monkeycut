@@ -28,9 +28,15 @@ CutPreviewDialog::CutPreviewDialog(const QString& path, const MediaInfo& info,
     connect(m_player, &Player::errorOccurred, this, [this](const QString& message) {
         setWindowTitle(tr("Cut preview: %1").arg(message));
     });
-    if (m_player->open(m_path, info) && !m_windows.isEmpty()) {
-        m_waitingForSeek = true;
-        m_player->seekFrame(m_windows.first().inFrame, true);
+    if (m_player->open(m_path, info)) {
+        if (m_windows.isEmpty()) {
+            // No join points to preview (e.g. a single keep-segment) -
+            // just play the whole exported file.
+            m_player->play();
+        } else {
+            m_waitingForSeek = true;
+            m_player->seekFrame(m_windows.first().inFrame, true);
+        }
     }
 }
 

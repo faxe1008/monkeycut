@@ -8,6 +8,7 @@
 
 class QLineEdit;
 class QLabel;
+class QPushButton;
 class QTreeWidget;
 class QTreeWidgetItem;
 class CutlistAtClient;
@@ -39,6 +40,7 @@ private:
     QLineEdit* m_query = nullptr;
     QTreeWidget* m_table = nullptr;
     QLabel* m_status = nullptr;
+    QPushButton* m_moreBtn = nullptr;
     QPushButton* m_okBtn = nullptr;
 
     QString m_queryStr;
