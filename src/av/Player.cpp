@@ -751,6 +751,7 @@ void Player::displayTick()
         m_lastShown = shownFrame;
         m_currentFrame = shownFrame;
         Q_EMIT frameAvailable(toShow);
+        Q_EMIT frameDisplayed(shownFrame);
         Q_EMIT positionChanged(shownFrame);
     }
 }

@@ -32,6 +32,8 @@ add_library(monkeycut STATIC
   ui/MainWindow.h
   ui/VideoView.cpp
   ui/VideoView.h
+  ui/CutPreviewDialog.cpp
+  ui/CutPreviewDialog.h
   ui/TimelineBar.cpp
   ui/TimelineBar.h
   ui/CutlistAtDialog.cpp

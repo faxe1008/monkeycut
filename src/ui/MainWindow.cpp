@@ -10,6 +10,7 @@
 #include "cut/Project.h"
 #include "cut/RecordingMatcher.h"
 #include "ui/CutlistAtDialog.h"
+#include "ui/CutPreviewDialog.h"
 #include "ui/SettingsDialog.h"
 #include "ui/TimelineBar.h"
 #include "ui/VideoView.h"
@@ -18,10 +19,12 @@
 #include <QComboBox>
 #include <QCloseEvent>
 #include <QCoreApplication>
+#include <QDir>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QFileInfo>
 #include <QFileDialog>
+#include <QFile>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
@@ -32,6 +35,7 @@
 #include <QSlider>
 #include <QStatusBar>
 #include <QTableWidget>
+#include <QTemporaryFile>
 #include <QToolButton>
 #include <QVBoxLayout>
 
@@ -107,6 +111,9 @@ void MainWindow::buildUi()
     m_stepFwdBtn = new QToolButton(transport);
     m_stepFwdBtn->setText(QStringLiteral("|▶︎"));
     m_stepFwdBtn->setToolTip(tr("One frame forward (→)"));
+    m_previewCutsBtn = new QToolButton(transport);
+    m_previewCutsBtn->setText(tr("Preview cuts"));
+    m_previewCutsBtn->setToolTip(tr("Preview five seconds around each cut"));
 
     auto* markInBtn = new QToolButton(transport);
     markInBtn->setText(QStringLiteral("I"));
@@ -142,6 +149,7 @@ void MainWindow::buildUi()
     btnRow->addWidget(m_stepBackBtn);
     btnRow->addWidget(m_playBtn);
     btnRow->addWidget(m_stepFwdBtn);
+    btnRow->addWidget(m_previewCutsBtn);
     btnRow->addSpacing(12);
     btnRow->addWidget(markInBtn);
     btnRow->addWidget(markOutBtn);
@@ -200,6 +208,7 @@ void MainWindow::buildUi()
     connect(m_stepBackBtn, &QToolButton::clicked,
             [this] { m_player->stepFrame(-1); });
     connect(m_stepFwdBtn, &QToolButton::clicked, [this] { m_player->stepFrame(1); });
+    connect(m_previewCutsBtn, &QToolButton::clicked, this, &MainWindow::previewCuts);
     connect(markInBtn, &QToolButton::clicked, this, &MainWindow::markIn);
     connect(markOutBtn, &QToolButton::clicked, this, &MainWindow::markOut);
     connect(delCutBtn, &QToolButton::clicked, this, &MainWindow::deleteSelectedCut);
@@ -248,6 +257,23 @@ void MainWindow::openFile()
 
 void MainWindow::openVideo(const QString& path)
 {
+    if (m_previewEngine) {
+        showInfo(tr("Please wait until the cut preview has finished preparing."));
+        return;
+    }
+    if (m_previewDialog) {
+        m_previewDialog->close();
+        m_previewDialog = nullptr;
+    }
+    if (m_previewEngine) {
+        m_previewEngine->deleteLater();
+        m_previewEngine = nullptr;
+    }
+    if (!m_previewPath.isEmpty()) {
+        QFile::remove(m_previewPath);
+        m_previewPath.clear();
+    }
+    m_previewCutsBtn->setText(tr("Preview cuts"));
     statusBar()->showMessage(tr("Reading file…"));
     QApplication::setOverrideCursor(Qt::WaitCursor);
     const MediaInfo info = AvProbe().probe(path);
@@ -678,6 +704,97 @@ void MainWindow::togglePlayPause()
         m_player->play();
 }
 
+void MainWindow::previewCuts()
+{
+    if (!m_player->isOpen())
+        return;
+    if (m_previewEngine || m_previewDialog) {
+        if (m_previewDialog) {
+            m_previewDialog->close();
+            m_previewDialog = nullptr;
+        }
+        return;
+    }
+    if (m_cutlist.cuts().isEmpty()) {
+        showInfo(tr("Nothing to preview – no keep-ranges yet."));
+        return;
+    }
+
+    const PlanResult plan = planCuts(m_cutlist.cuts(), m_gop, m_player->totalFrames());
+    if (!plan.ok || plan.segments.isEmpty()) {
+        showError(tr("Nothing to preview for the selected keep-ranges."));
+        return;
+    }
+
+    const QString suffix = QFileInfo(m_path).suffix().isEmpty()
+        ? QStringLiteral("mkv")
+        : QFileInfo(m_path).suffix();
+    QTemporaryFile temp(QDir::tempPath() + QStringLiteral("/monkeycut-preview-XXXXXX.")
+                        + suffix);
+    temp.setAutoRemove(false);
+    if (!temp.open()) {
+        showError(tr("Could not create a temporary cut preview file."));
+        return;
+    }
+    m_previewPath = temp.fileName();
+    temp.close();
+    QFile::remove(m_previewPath);
+    m_player->pause();
+    m_previewCutsBtn->setEnabled(false);
+    m_previewEngine = new CuttingEngine(this);
+    connect(m_previewEngine, &CuttingEngine::progress, this,
+            [this](qint64 done, qint64 total) {
+                statusBar()->showMessage(tr("Preparing cut preview… %1 / %2")
+                                             .arg(done).arg(total));
+            });
+    connect(m_previewEngine, &CuttingEngine::finished, this,
+            [this, plan](bool ok, const QString& message) {
+                CuttingEngine* engine = m_previewEngine;
+                m_previewEngine = nullptr;
+                if (engine)
+                    engine->deleteLater();
+                m_previewCutsBtn->setEnabled(true);
+                if (!ok) {
+                    QFile::remove(m_previewPath);
+                    showError(tr("Cut preview failed: %1").arg(message));
+                    return;
+                }
+                const MediaInfo info = AvProbe().probe(m_previewPath);
+                if (!info.ok) {
+                    QFile::remove(m_previewPath);
+                    showError(tr("Could not open the generated cut preview."));
+                    return;
+                }
+                QVector<Cut> windows;
+                qint64 outputOffset = 0;
+                const qint64 margin = qRound64(m_player->fps().value() * 5.0);
+                for (int i = 0; i + 1 < plan.segments.size(); ++i) {
+                    const PlannedSegment& segment = plan.segments[i];
+                    const qint64 segmentLength = segment.outFrame - segment.inFrame;
+                    const qint64 join = outputOffset + segmentLength;
+                    windows.append(Cut(qMax<qint64>(0, join - margin), join));
+                    const qint64 nextLength = plan.segments[i + 1].outFrame
+                                             - plan.segments[i + 1].inFrame;
+                    windows.append(Cut(join, join + qMin(margin, nextLength)));
+                    outputOffset += segmentLength;
+                }
+                m_previewDialog = new CutPreviewDialog(m_previewPath, info, windows, this);
+                m_previewDialog->setAttribute(Qt::WA_DeleteOnClose);
+                connect(m_previewDialog, &QObject::destroyed, this,
+                        [this] { m_previewDialog = nullptr; });
+                m_previewDialog->show();
+                m_previewPath.clear();
+                statusBar()->showMessage(tr("Cut preview ready."), 3000);
+            });
+    if (!m_previewEngine->start(m_path, m_previewPath, plan.segments, m_player->fps())) {
+        m_previewEngine->deleteLater();
+        m_previewEngine = nullptr;
+        m_previewCutsBtn->setEnabled(true);
+        QFile::remove(m_previewPath);
+        m_previewPath.clear();
+    }
+}
+
 void MainWindow::updatePosition(qint64 frame)
 {
     if (m_player->isOpen() && m_player->fps().isValid()) {
@@ -780,6 +897,12 @@ void MainWindow::dropEvent(QDropEvent* event)
 
 void MainWindow::closeEvent(QCloseEvent* event)
 {
+    if (m_previewDialog)
+        m_previewDialog->close();
+    if (m_previewEngine)
+        m_previewEngine->deleteLater();
+    if (!m_previewPath.isEmpty())
+        QFile::remove(m_previewPath);
     m_player->close();
     event->accept();
 }

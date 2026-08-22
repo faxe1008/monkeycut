@@ -18,6 +18,7 @@ class VideoView;
 class TimelineBar;
 class CuttingEngine;
 class CutlistAtDialog;
+class CutPreviewDialog;
 struct CulFile;
 
 class MainWindow : public QMainWindow
@@ -49,6 +50,7 @@ private slots:
     void saveCutlist();
     void saveProject();
     void togglePlayPause();
+    void previewCuts();
     void markIn();
     void markOut();
     void deleteSelectedCut();
@@ -76,6 +78,7 @@ private:
     QToolButton* m_playBtn = nullptr;
     QToolButton* m_stepBackBtn = nullptr;
     QToolButton* m_stepFwdBtn = nullptr;
+    QToolButton* m_previewCutsBtn = nullptr;
     QComboBox* m_speedBox = nullptr;
     TimelineBar* m_timeline = nullptr;
     QTableWidget* m_cutTable = nullptr;
@@ -87,4 +90,7 @@ private:
     Cutlist m_cutlist;
     qint64 m_markIn = -1;
     bool m_sliderBusy = false;
+    CuttingEngine* m_previewEngine = nullptr;
+    CutPreviewDialog* m_previewDialog = nullptr;
+    QString m_previewPath;
 };

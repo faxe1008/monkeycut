@@ -49,6 +49,7 @@ public:
 
 signals:
     void frameAvailable(const QImage& image); // next displayable frame
+    void frameDisplayed(qint64 frame);         // frame actually shown
     void positionChanged(qint64 frame);       // current frame (transport/scrub)
     void stateChanged(Player::State state);
     void errorOccurred(const QString& message);
